@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Byzantine Study Game</title>
+<style>
+/* Plain black on white. No color scheme. Chunky borders and small pop animations for fun. */
+body {
+  margin: 0;
+  background: #fff;
+  color: #000;
+  font: 17px/1.5 Arial, Helvetica, sans-serif;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 24px;
+  padding-bottom: 40px;
+  overflow-x: hidden;
+}
+main { max-width: 620px; margin: 0 auto; }
+h1 { font-size: 1.9rem; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.02em; }
+.tag { margin: 0 0 18px; }
+h2 { font-size: 1.15rem; margin: 18px 0 10px; text-transform: uppercase; }
+button {
+  font: inherit;
+  color: #000;
+  background: #fff;
+  border: 3px solid #000;
+  border-radius: 0;
+  padding: 10px 16px;
+  min-height: 46px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform .08s ease;
+}
+button:active:not(:disabled) { transform: translate(2px, 2px); }
+button:focus-visible { outline: 3px dashed #000; outline-offset: 3px; }
+button.primary { background: #000; color: #fff; }
+button.active { background: #000; color: #fff; }
+button:disabled { opacity: 0.35; cursor: default; }
+.big { display: block; width: 100%; text-align: left; margin-bottom: 12px; padding: 18px; font-size: 1.15rem; }
+.big small { display: block; font-size: 0.92rem; font-weight: normal; margin-top: 6px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.spacer { margin-left: auto; }
+.bar { height: 14px; border: 3px solid #000; margin-bottom: 16px; }
+.bar > div { height: 100%; width: 0; background: #000; transition: width .3s ease; }
+.box { border: 3px solid #000; padding: 20px; }
+.meta { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; font-weight: bold; }
+.question { font-size: 1.25rem; font-weight: bold; margin: 0 0 16px; }
+.choices { display: grid; gap: 10px; }
+.choice { text-align: left; width: 100%; font-weight: normal; }
+.choice.correct { border-width: 5px; font-weight: bold; }
+.choice.wrong { text-decoration: line-through; }
+.feedback { margin-top: 16px; padding: 12px; border: 3px solid #000; }
+.feedback strong { display: block; margin-bottom: 4px; font-size: 1.1rem; }
+.row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+.num { font-variant-numeric: tabular-nums; font-weight: bold; }
+.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.stat { border: 3px solid #000; padding: 6px 12px; font-weight: bold; font-variant-numeric: tabular-nums; }
+.timer { font-size: 2.2rem; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1; }
+.timer.low { text-decoration: underline; }
+.flash { min-height: 200px; display: flex; flex-direction: column; justify-content: center; text-align: center; cursor: pointer; }
+.hint { font-size: 0.92rem; }
+.hidden { display: none !important; }
+.rank { font-size: 2rem; font-weight: bold; text-transform: uppercase; line-height: 1.1; margin: 8px 0; }
+.score-big { font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+ul.topics { padding-left: 20px; margin: 8px 0 16px; }
+.lesson { border: 3px solid #000; padding: 16px; margin-bottom: 14px; }
+.lesson h3 { margin: 0 0 6px; font-size: 1.1rem; text-transform: uppercase; }
+.pop { animation: pop .35s ease; }
+@keyframes pop { 0% { transform: scale(.94); } 60% { transform: scale(1.03); } 100% { transform: scale(1); } }
+.shake { animation: shake .35s ease; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .pop, .shake { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">&larr; Back to hub</a></p>
+  <h1>Byzantine Study Game</h1>
+  <p class="tag">Beat the quiz. Clear the deck. Become a Legend of Constantinople.</p>
+
+  <!-- START -->
+  <section id="startView">
+    <h2>Pick your path</h2>
+    <p class="hint" id="predictLine" style="margin-top:0"></p>
+    <p class="hint">These questions were made with computer generation, not taken from Mr. Yingling's test.</p>
+    <button class="big" id="startLearn">Learning Center
+      <small>Lessons you can rush through (ASAP) or take at your own pace.</small>
+    </button>
+    <button class="big" id="startTest">Take the test
+      <small>20 seconds per question. No hints. Find out your rank and what to study next.</small>
+    </button>
+    <button class="big" id="startStudy">Jump into studying
+      <small>Flashcards, streaks, and practice questions with answers right away.</small>
+    </button>
+  </section>
+
+  <!-- TEST -->
+  <section id="testView" class="hidden">
+    <div class="tabs">
+      <span class="num" id="testCount"></span>
+      <button class="spacer" id="testQuit">Quit</button>
+    </div>
+    <p class="hint">These questions were made with computer generation, not taken from Mr. Yingling's test.</p>
+    <div class="bar"><div id="testFill"></div></div>
+    <div class="box" id="testBox">
+      <div class="row" style="margin-top:0">
+        <div class="meta" id="testTopic"></div>
+        <div class="timer" id="testTimer">20</div>
+      </div>
+      <p class="question" id="testText"></p>
+      <div class="choices" id="testChoices"></div>
+      <div class="row">
+        <span class="hint">Pick an answer, then move on.</span>
+        <button class="primary" id="testNext" disabled>Next</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEST RESULTS -->
+  <section id="resultsView" class="hidden">
+    <div class="box" style="text-align:center">
+      <div class="meta">Your predicted test score</div>
+      <div class="score-big" id="predBig"></div>
+      <div class="hint" id="predNote"></div>
+    </div>
+    <div class="row">
+      <button class="primary" id="studyMissed">Study what I missed</button>
+      <button id="studyAll">Study everything</button>
+      <button id="retake">Take it again</button>
+      <button id="backStart">Home</button>
+    </div>
+  </section>
+
+  <!-- LEARNING CENTER -->
+  <section id="learnView" class="hidden">
+    <div class="tabs">
+      <span class="meta" style="margin:0">Learning Center</span>
+      <button class="spacer" id="learnBack">Home</button>
+    </div>
+    <p class="hint">Pick a lesson. ASAP shows the key points and a quick check. Take your time walks through each point, then the flashcards, then the questions.</p>
+    <div id="lessonList"></div>
+  </section>
+
+  <!-- LESSON -->
+  <section id="lessonView" class="hidden">
+    <div class="tabs">
+      <button id="lessonQuit">Exit lesson</button>
+    </div>
+    <div class="bar"><div id="lessonFill"></div></div>
+    <div class="hint" id="lessonCount" style="margin-bottom:8px"></div>
+    <div class="box" id="lessonBox"><div id="lessonBody"></div></div>
+    <div class="row" id="lessonNav">
+      <button id="lessonBack">Back</button>
+      <button class="primary" id="lessonNext">Next</button>
+    </div>
+  </section>
+
+  <!-- STUDY -->
+  <section id="studyView" class="hidden">
+    <div class="tabs">
+      <button id="tabFlash" class="active">Flashcards</button>
+      <button id="tabPractice">Practice</button>
+      <button id="tabEssay">Essay</button>
+      <button id="soundBtn">Sound: on</button>
+      <button class="spacer" id="studyBack">Home</button>
+    </div>
+    <div id="studyScope" class="hint" style="margin-bottom:12px"></div>
+
+    <!-- Flashcards: Got it removes a card from the deck, Again sends it to the back -->
+    <div id="flashPanel">
+      <div class="stats">
+        <div class="stat" id="deckLeft"></div>
+        <div class="stat" id="deckGot"></div>
+      </div>
+      <div class="box flash" id="flashCard" tabindex="0" role="button" aria-label="Flip card">
+        <div class="meta" id="flashSide"></div>
+        <p class="question" id="flashText" style="margin:0"></p>
+        <p class="hint" id="flashHint"></p>
+      </div>
+      <div class="row" id="flashButtons">
+        <button id="againBtn">Again</button>
+        <button class="primary" id="gotBtn">Got it</button>
+      </div>
+      <div class="row hidden" id="deckDoneRow">
+        <button class="primary" id="deckReset">Shuffle the deck again</button>
+      </div>
+    </div>
+
+    <!-- Practice: streak and points -->
+    <div id="practicePanel" class="hidden">
+      <div class="stats">
+        <div class="stat" id="pStreak">Streak 0</div>
+        <div class="stat" id="pPoints">Points 0</div>
+      </div>
+      <div class="box" id="pBox">
+        <div class="meta" id="pTopic"></div>
+        <p class="question" id="pText"></p>
+        <div class="choices" id="pChoices"></div>
+        <div class="feedback hidden" id="pFeedback"></div>
+        <div class="row">
+          <span class="num" id="pCount"></span>
+          <button class="primary" id="pNext" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+    <div id="essayPanel" class="hidden">
+      <div class="box">
+        <div class="meta" id="essayCount"></div>
+        <p class="question" id="essayPrompt"></p>
+        <textarea id="essayText" rows="10" placeholder="Write your answer here. Use complete sentences." style="width:100%; font:inherit; border:3px solid #000; padding:10px; box-sizing:border-box; background:#fff; color:#000;"></textarea>
+        <div class="row">
+          <span class="num" id="essayWords"></span>
+          <button id="essayGrade" class="primary">Grade my essay</button>
+          <button id="essayShow">Show key points</button>
+        </div>
+        <div id="essayResult" class="feedback hidden"></div>
+        <div id="essayPoints" class="hidden" style="margin-top:14px"></div>
+      </div>
+      <div class="row">
+        <button id="essayPrev">Previous</button>
+        <button class="primary" id="essayNext">Next prompt</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ===== CONTENT: from the Byzantine packet (Lessons 28 to 30) =====
+   QUESTIONS: q = question, choices = answers, answer = index of correct choice (0 = first),
+   why = short explanation, topic = section name used for the by-topic breakdown.
+   CARDS: term = front, def = back, topic = section name. */
+const QUESTIONS = [
+  { topic: "Byzantine Empire", q: "In 330 CE, Constantine moved the capital of the empire from Rome to which city?",
+    choices: ["Byzantium", "Athens", "Alexandria", "Jerusalem"], answer: 0,
+    why: "Byzantium was later renamed Constantinople, today's Istanbul." },
+  { topic: "Byzantine Empire", q: "What protected Constantinople on three sides?",
+    choices: ["Water", "Mountains", "Desert", "Forest"], answer: 0,
+    why: "Water on three sides made the city easy to defend, and a wall protected the fourth side." },
+  { topic: "Byzantine Empire", q: "Which continents did the Byzantine Empire include?",
+    choices: ["Europe, Asia, and Africa", "Europe only", "Asia and South America", "Africa and Australia"], answer: 0,
+    why: "The empire included portions of Europe, Asia, and Africa from 395 to 1452 CE." },
+  { topic: "Byzantine Empire", q: "What religion did Emperor Theodosius I make the Roman Empire?",
+    choices: ["Christian", "Muslim", "Jewish", "Greek"], answer: 0,
+    why: "Theodosius I decreed that the Roman Empire would be a Christian empire." },
+  { topic: "Byzantine Empire", q: "What city was the Byzantine capital, known today as Istanbul?",
+    choices: ["Constantinople", "Athens", "Cairo", "Baghdad"], answer: 0,
+    why: "Constantinople sat on the Bosporus and controlled trade between Europe and Asia." },
+  { topic: "Justinian", q: "What did Justinian organize and simplify into a code?",
+    choices: ["Roman law", "The Silk Road", "The Crusades", "Islamic law"], answer: 0,
+    why: "The Justinian Code became the basis of modern Western law." },
+  { topic: "Justinian", q: "What event forced Justinian to rebuild parts of Constantinople?",
+    choices: ["Riots and fires in the streets", "A Mongol invasion", "The Crusades", "A Seljuk takeover"], answer: 0,
+    why: "The Nika riots of 532 CE spread fights and fires through the city." },
+  { topic: "Justinian", q: "Theodora, Justinian's wife, had worked as what before marrying him?",
+    choices: ["A performer", "A queen of the Goths", "A Muslim scholar", "A pope"], answer: 0,
+    why: "Theodora was born a peasant and worked as a performer. She co-ruled with Justinian." },
+  { topic: "Justinian", q: "The Hagia Sophia, built under Justinian, still stands in which city?",
+    choices: ["Istanbul", "Rome", "Baghdad", "Jerusalem"], answer: 0,
+    why: "The Hagia Sophia is in Istanbul, the former Constantinople." },
+  { topic: "Church Split", q: "What was Iconoclasm?",
+    choices: ["The destruction of religious images", "A trade route", "A type of ship", "A Crusade"], answer: 0,
+    why: "Iconoclasm was the destruction of religious art, such as painted icons." },
+  { topic: "Church Split", q: "In 800 CE, which ruler did the pope crown Holy Roman Emperor?",
+    choices: ["Charlemagne", "Justinian", "Saladin", "Constantine"], answer: 0,
+    why: "Charlemagne, King of the Franks, was crowned by the pope. Constantinople saw this as illegitimate." },
+  { topic: "Church Split", q: "What was the 1054 split between the Catholic and Orthodox churches called?",
+    choices: ["The East-West Schism", "The Nika Revolt", "The Great Migration", "The Iconoclasm"], answer: 0,
+    why: "The pope and the patriarch excommunicated each other's leaders. The split was not mended until 1964." },
+  { topic: "Church Split", q: "Who led the Eastern Orthodox Church in Constantinople?",
+    choices: ["The patriarch", "The pope", "The caliph", "The sultan"], answer: 0,
+    why: "The patriarch was the top Orthodox bishop. The pope led the Catholic Church in Rome." },
+  { topic: "Arabian Peninsula", q: "Why were Arabs not united like the city-states of Greece?",
+    choices: ["Harsh geography kept people in small clans and tribes", "They had no religion", "The Byzantines ruled them", "They lived on islands"], answer: 0,
+    why: "The harsh landscape led people to band together in clans or tribes, which shared religion, language, and culture." },
+  { topic: "Arabian Peninsula", q: "What was Muhammad's job before he received messages from the angel Gabriel?",
+    choices: ["Trader", "Soldier", "Farmer", "Emperor"], answer: 0,
+    why: "Muhammad worked as a merchant and trader for many years." },
+  { topic: "Arabian Peninsula", q: "What is a caliph?",
+    choices: ["The Muslim ruler who came to power after Muhammad", "A marketplace", "A holy book", "A Byzantine general"], answer: 0,
+    why: "The caliph was the Muslim ruler after Muhammad's death. A souk is a marketplace." },
+  { topic: "Arabian Peninsula", q: "Which two items guide Muslims: the holy book and the Sunnah?",
+    choices: ["The Qur'an and the Sunnah", "The Torah and the Talmud", "The Bible and the Gospels", "The Five Pillars and the Silk Road"], answer: 0,
+    why: "The Qur'an is the holy book, and the Sunnah shows how Muslims should practice their faith." },
+  { topic: "Arabian Peninsula", q: "Islam, Judaism, and Christianity all trace their origin back to which prophet?",
+    choices: ["Abraham", "Justinian", "Charlemagne", "Saladin"], answer: 0,
+    why: "All three faiths believe in one God and trace their origin back to the prophet Abraham." },
+  { topic: "Islamic Empire", q: "The Umayyad caliphs let conquered people do what?",
+    choices: ["Keep their own religion", "Leave the empire", "Speak only Greek", "Move to Rome"], answer: 0,
+    why: "Unlike the Byzantine and Persian empires, the Umayyads did not force conversion." },
+  { topic: "Islamic Empire", q: "The Abbasid dynasty was centered in which city?",
+    choices: ["Baghdad", "Damascus", "Cordoba", "Jerusalem"], answer: 0,
+    why: "The Abbasids ruled from Baghdad from 750 to 1258 CE, during a high point of learning and trade." },
+  { topic: "Islamic Empire", q: "In what year did the Mongols invade and sack Baghdad, ending the Abbasid empire?",
+    choices: ["1258", "1054", "1187", "1453"], answer: 0,
+    why: "The Mongol invasion of 1258 ended the Abbasid empire." },
+  { topic: "Crusades", q: "Which leader captured Jerusalem from the Christians in 1187 CE?",
+    choices: ["Saladin (Salah al-Din)", "Charlemagne", "Justinian", "Richard I"], answer: 0,
+    why: "Saladin captured Jerusalem. In the Third Crusade he fought King Richard I to a stalemate." },
+  { topic: "Crusades", q: "Why is Jerusalem holy to Muslims?",
+    choices: ["Muhammad ascended to heaven from there", "The Great Temple once stood there", "Jesus was crucified there", "It was the first Byzantine capital"], answer: 0,
+    why: "The Dome of the Rock marks the place where Muhammad ascended to heaven." },
+  { topic: "Crusades", q: "Why is Jerusalem holy to Jews?",
+    choices: ["The Great Temple once stood there", "Muhammad ascended to heaven from there", "It was a Roman fort", "It is a trade port"], answer: 0,
+    why: "The Western Wall is the remaining wall of the Jewish Temple site." },
+  { topic: "Crusades", q: "What physical feature formed the southern boundary of Islamic lands in Africa?",
+    choices: ["The Sahara Desert", "The Nile River", "The Mediterranean Sea", "The Atlantic Ocean"], answer: 0,
+    why: "The Sahara Desert, a huge area of sand, formed the southern boundary." },
+  { topic: "Innovations", q: "What did al-Khwarizmi's books introduce to Europe along with algebra?",
+    choices: ["Hindu-Arabic numerals", "Roman numerals", "The compass", "Gunpowder"], answer: 0,
+    why: "His books brought Hindu-Arabic numerals and algebra to Europe." },
+  { topic: "Innovations", q: "Which work by Ibn Sina was a standard medical textbook in Europe for centuries?",
+    choices: ["The Canon of Medicine", "The Justinian Code", "One Thousand and One Nights", "The Qur'an"], answer: 0,
+    why: "The Canon of Medicine was used in Europe for centuries." },
+  { topic: "Innovations", q: "The concept of zero helped Muslims make which kind of math possible?",
+    choices: ["Place-value math", "Roman numeral math", "Geometry only", "Map making"], answer: 0,
+    why: "Zero, which came from India, makes place-value calculation possible." },
+  { topic: "Innovations", q: "Where did One Thousand and One Nights have its roots?",
+    choices: ["India and Persia", "Rome and Greece", "Egypt and Libya", "Spain and France"], answer: 0,
+    why: "The stories had roots in India and Persia and spread through the Muslim world." },
+  { topic: "Innovations", q: "Which tool helped sailors and astronomers find their way and tell time?",
+    choices: ["The astrolabe", "The aqueduct", "The Silk Road", "The Basilica Cistern"], answer: 0,
+    why: "Muslim scholars improved the astrolabe, which was used for navigation and astronomy." }
+];
+
+const CARDS = [
+  { topic: "Byzantine Empire", term: "Byzantine Empire", def: "The eastern Roman Empire, lasting from 395 to 1452 CE, with its capital at Constantinople." },
+  { topic: "Byzantine Empire", term: "Constantinople", def: "The Byzantine capital, formerly Byzantium, now Istanbul. It sat on a defensible site with a great harbor." },
+  { topic: "Byzantine Empire", term: "Bosporus Strait", def: "The waterway that, with Constantinople, controlled trade between Europe and Asia." },
+  { topic: "Byzantine Empire", term: "Basilica Cistern", def: "The underground water storage in Constantinople, fed by Valens's 400-mile aqueduct." },
+  { topic: "Justinian", term: "Justinian (483 to 565 CE)", def: "A Byzantine emperor born a peasant who rose through the army and organized Roman law." },
+  { topic: "Justinian", term: "Justinian Code", def: "Justinian's organized, simplified Roman law. It became the basis of modern Western law." },
+  { topic: "Justinian", term: "Theodora", def: "Justinian's wife, a former performer who co-ruled with him and championed the poor and women's rights." },
+  { topic: "Church Split", term: "Iconoclasm", def: "The destruction of religious images, such as icons, which divided the churches." },
+  { topic: "Church Split", term: "Patriarch", def: "The top Orthodox bishop, in Constantinople." },
+  { topic: "Church Split", term: "East-West Schism", def: "The 1054 split between the Roman Catholic and Eastern Orthodox churches." },
+  { topic: "Arabian Peninsula", term: "Clan or tribe", def: "A group of related families. Arab clans shared religion, language, and culture." },
+  { topic: "Arabian Peninsula", term: "Souk", def: "The marketplace at the center of a Muslim city." },
+  { topic: "Arabian Peninsula", term: "Caliph", def: "The Muslim ruler who came to power after Muhammad's death." },
+  { topic: "Arabian Peninsula", term: "Sunnah", def: "How Muslims should practice their religion, along with the Qur'an, which guides the Five Pillars of Faith." },
+  { topic: "Islamic Empire", term: "Sunni and Shi'a", def: "The two groups that split over who should lead. Shi'as believe only descendants of Ali can rule. About 85% of Muslims are Sunni." },
+  { topic: "Islamic Empire", term: "Abbasid Dynasty", def: "The dynasty centered in Baghdad, 750 to 1258 CE, which reached a high point of learning and trade." },
+  { topic: "Islamic Empire", term: "Seljuk Turks", def: "Central Asian people who invaded in 1055 CE and ruled as sultans, which led to conflict with Byzantium and the Crusades." },
+  { topic: "Crusades", term: "Crusades", def: "Military campaigns by Christian Europe to take the Holy Land and Jerusalem from Muslim control." },
+  { topic: "Crusades", term: "Saladin (Salah al-Din)", def: "The Seljuk leader who captured Jerusalem in 1187 CE and fought Richard I to a stalemate." },
+  { topic: "Crusades", term: "Holy Land", def: "The region around Jerusalem, holy to Christians, Muslims, and Jews." },
+  { topic: "Innovations", term: "Cultural diffusion", def: "The spread of ideas and ways of life when cultures interact through trade, travel, and contact." },
+  { topic: "Innovations", term: "Al-Khwarizmi", def: "A scholar whose books brought algebra and Hindu-Arabic numerals to Europe." },
+  { topic: "Innovations", term: "Ibn Sina (Avicenna)", def: "Wrote The Canon of Medicine, a standard medical textbook in Europe for centuries." },
+  { topic: "Innovations", term: "Sahara Desert", def: "The huge desert that formed the southern boundary of Islamic lands in Africa." }
+];
+
+const TEST_SECONDS = 20;
+
+/* ===== HELPERS ===== */
+const $ = id => document.getElementById(id);
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function show(id) {
+  ["startView", "testView", "resultsView", "studyView", "learnView", "lessonView"].forEach(v => $(v).classList.toggle("hidden", v !== id));
+  if (id !== "testView") stopTimer();
+  if (id === "startView") renderPrediction();
+}
+function topicsOf(list, key) {
+  return [...new Set(list.map(x => x[key] || "General"))];
+}
+function replay(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+/* Small beeps with the Web Audio API. Only plays after a click, and fails quietly. */
+let soundOn = true;
+function beep(freq, ms) {
+  if (!soundOn) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.value = 0.06;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + ms / 1000);
+  } catch (e) { /* no sound available */ }
+}
+function cheer() { beep(660, 90); setTimeout(() => beep(880, 120), 100); }
+function oops() { beep(220, 220); }
+$("soundBtn").addEventListener("click", () => {
+  soundOn = !soundOn;
+  $("soundBtn").textContent = `Sound: ${soundOn ? "on" : "off"}`;
+});
+
+/* ===== START ===== */
+$("startTest").addEventListener("click", startTest);
+$("startStudy").addEventListener("click", () => startStudy(null));
+
+/* ===== TEST ===== */
+let timerId = null;
+let timeLeft = TEST_SECONDS;
+
+function stopTimer() {
+  if (timerId) clearInterval(timerId);
+  timerId = null;
+}
+
+function startTest() {
+  lastPrediction = predictScore().pct;
+  testOrder = shuffle(QUESTIONS.map((_, i) => i));
+  testPos = 0;
+  testAnswers = [];
+  show("testView");
+  renderTest();
+}
+
+function renderTest() {
+  const total = testOrder.length;
+  if (testPos >= total) return finishTest();
+  const item = QUESTIONS[testOrder[testPos]];
+  $("testCount").textContent = `Question ${testPos + 1} of ${total}`;
+  $("testFill").style.width = `${(testPos / total) * 100}%`;
+  $("testTopic").textContent = item.topic || "General";
+  $("testText").textContent = item.q;
+  $("testNext").disabled = true;
+  $("testNext").textContent = testPos === total - 1 ? "See results" : "Next";
+  replay($("testBox"), "pop");
+
+  const box = $("testChoices");
+  box.innerHTML = "";
+  item.choices.forEach((text, idx) => {
+    const b = document.createElement("button");
+    b.className = "choice";
+    b.textContent = text;
+    b.addEventListener("click", () => {
+      // Test mode: no feedback yet. Mark the pick and allow moving on.
+      [...box.children].forEach(c => c.classList.remove("active"));
+      b.classList.add("active");
+      testAnswers[testPos] = { qi: testOrder[testPos], picked: idx };
+      $("testNext").disabled = false;
+    });
+    box.appendChild(b);
+  });
+  if (testAnswers[testPos]) {
+    [...box.children][testAnswers[testPos].picked].classList.add("active");
+    $("testNext").disabled = false;
+  }
+
+  // Timer: restart for each question that has no answer yet.
+  stopTimer();
+  timeLeft = TEST_SECONDS;
+  drawTimer();
+  if (!testAnswers[testPos]) {
+    timerId = setInterval(() => {
+      timeLeft--;
+      drawTimer();
+      if (timeLeft <= 0) {
+        stopTimer();
+        // Ran out of time: record no answer and move on.
+        testAnswers[testPos] = { qi: testOrder[testPos], picked: -1 };
+        testPos++;
+        renderTest();
+      }
+    }, 1000);
+  }
+}
+
+function drawTimer() {
+  const t = $("testTimer");
+  t.textContent = Math.max(timeLeft, 0);
+  t.classList.toggle("low", timeLeft <= 5);
+  if (timeLeft <= 5 && timeLeft > 0) replay(t, "shake");
+}
+
+let testOrder = [];   // indices into QUESTIONS
+let testPos = 0;
+let testAnswers = []; // {qi, picked}
+
+$("testNext").addEventListener("click", () => {
+  stopTimer();
+  testPos++;
+  renderTest();
+});
+$("testQuit").addEventListener("click", () => show("startView"));
+
+function rankFor(pct) {
+  if (pct >= 90) return ["Legend of Constantinople", "You know this empire inside out."];
+  if (pct >= 70) return ["Court Scholar", "Strong work. Polish the topics you missed."];
+  if (pct >= 50) return ["Apprentice of Byzantium", "Good start. Study the misses and run it back."];
+  return ["Still Inside the Walls", "Every expert started here. Study, then take it again."];
+}
+
+function finishTest() {
+  stopTimer();
+  show("resultsView");
+  const total = testOrder.length;
+  const results = testAnswers.map(a => ({ ...a, correct: a.picked === QUESTIONS[a.qi].answer }));
+  const score = results.filter(r => r.correct).length;
+  const pct = total ? Math.round((score / total) * 100) : 0;
+  results.forEach(r => recordAnswer(r.qi, r.correct));
+  // Results show only the updated predicted score, not the test score.
+  $("predBig").textContent = `${predictScore().pct}%`;
+  $("predNote").textContent = "Based on everything you have answered so far. Study what you missed to raise it.";
+
+  // Missed questions
+  const missed = results.filter(r => !r.correct);
+  $("studyMissed").disabled = !missed.length;
+  $("studyMissed").onclick = () => {
+    // Only the missed questions: practice uses them directly, and flashcards are built from them.
+    startStudy({
+      qs: missed.map(r => r.qi),
+      cards: missed.map(r => {
+        const item = QUESTIONS[r.qi];
+        return { topic: item.topic, term: item.q, def: item.choices[item.answer] + ". " + item.why };
+      }),
+      label: `Only your ${missed.length} missed question${missed.length === 1 ? "" : "s"}`
+    });
+  };
+}
+$("studyAll").addEventListener("click", () => startStudy(null));
+$("retake").addEventListener("click", startTest);
+$("backStart").addEventListener("click", () => show("startView"));
+
+/* ===== STUDY ===== */
+// scope null = everything; otherwise {qs, cards, label}
+let studyQs = [];
+let studyCards = [];
+let pIdx = 0, pAnswered = false, pStreak = 0, pPoints = 0;
+let deck = [];        // card indices still to get right
+let gotCount = 0;
+let flipped = false;
+
+function startStudy(scope) {
+  studyQs = scope ? scope.qs : QUESTIONS.map((_, i) => i);
+  studyCards = scope ? scope.cards : CARDS.slice();
+  $("studyScope").textContent = scope ? scope.label : "Everything in the packet";
+  pIdx = 0; pAnswered = false; pStreak = 0; pPoints = 0;
+  deck = shuffle(studyCards);
+  gotCount = 0;
+  flipped = false;
+  show("studyView");
+  setStudyTab("flash");
+}
+
+function setStudyTab(tab) {
+  $("flashPanel").classList.toggle("hidden", tab !== "flash");
+  $("practicePanel").classList.toggle("hidden", tab !== "practice");
+  $("essayPanel").classList.toggle("hidden", tab !== "essay");
+  $("tabFlash").classList.toggle("active", tab === "flash");
+  $("tabPractice").classList.toggle("active", tab === "practice");
+  $("tabEssay").classList.toggle("active", tab === "essay");
+  if (tab === "flash") renderCard();
+  else if (tab === "practice") renderPractice();
+  else renderEssay();
+}
+$("tabFlash").addEventListener("click", () => setStudyTab("flash"));
+$("tabPractice").addEventListener("click", () => setStudyTab("practice"));
+$("tabEssay").addEventListener("click", () => setStudyTab("essay"));
+$("studyBack").addEventListener("click", () => show("startView"));
+
+/* Flashcards: Got it removes the card. Again sends it to the back of the deck. */
+function renderCard() {
+  const total = studyCards.length;
+  $("deckGot").textContent = `Got: ${gotCount}`;
+  $("deckLeft").textContent = `Left: ${deck.length}`;
+  if (!total) {
+    $("flashText").textContent = "No cards for this topic yet.";
+    $("flashSide").textContent = "";
+    $("flashHint").textContent = "";
+    $("flashButtons").classList.add("hidden");
+    return;
+  }
+  if (!deck.length) {
+    $("flashText").textContent = "Deck cleared. Every card is a Got it.";
+    $("flashSide").textContent = "Done";
+    $("flashHint").textContent = "";
+    $("flashButtons").classList.add("hidden");
+    $("deckDoneRow").classList.remove("hidden");
+    cheer();
+    return;
+  }
+  $("flashButtons").classList.toggle("hidden", !flipped);
+  $("deckDoneRow").classList.add("hidden");
+  const c = deck[0];
+  $("flashSide").textContent = flipped ? "Definition" : "Term";
+  $("flashText").textContent = flipped ? c.def : c.term;
+  $("flashHint").textContent = flipped ? "" : "Tap the card to flip it";
+  replay($("flashCard"), "pop");
+}
+function flipCard() {
+  if (!deck.length) return;
+  flipped = !flipped;
+  renderCard();
+}
+function gotCard() {
+  deck.shift();
+  gotCount++;
+  flipped = false;
+  cheer();
+  renderCard();
+}
+function againCard() {
+  deck.push(deck.shift());
+  flipped = false;
+  oops();
+  renderCard();
+}
+function resetDeck() {
+  deck = shuffle(studyCards);
+  gotCount = 0;
+  flipped = false;
+  renderCard();
+}
+$("flashCard").addEventListener("click", flipCard);
+$("flashCard").addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipCard(); }
+});
+$("gotBtn").addEventListener("click", gotCard);
+$("againBtn").addEventListener("click", againCard);
+$("deckReset").addEventListener("click", resetDeck);
+
+/* Practice: streaks and points */
+function renderPractice() {
+  $("pStreak").textContent = `Streak ${pStreak}`;
+  $("pPoints").textContent = `Points ${pPoints}`;
+  if (!studyQs.length) {
+    $("pText").textContent = "No questions for this topic yet.";
+    $("pChoices").innerHTML = "";
+    $("pCount").textContent = "";
+    $("pNext").disabled = true;
+    return;
+  }
+  const item = QUESTIONS[studyQs[pIdx]];
+  pAnswered = false;
+  $("pTopic").textContent = item.topic || "General";
+  $("pText").textContent = item.q;
+  $("pCount").textContent = `${pIdx + 1} of ${studyQs.length}`;
+  $("pFeedback").classList.add("hidden");
+  $("pFeedback").textContent = "";
+  $("pNext").disabled = true;
+  $("pNext").textContent = pIdx === studyQs.length - 1 ? "Start over" : "Next";
+  replay($("pBox"), "pop");
+  const box = $("pChoices");
+  box.innerHTML = "";
+  item.choices.forEach((text, idx) => {
+    const b = document.createElement("button");
+    b.className = "choice";
+    b.textContent = text;
+    b.addEventListener("click", () => answerPractice(idx));
+    box.appendChild(b);
+  });
+}
+function answerPractice(idx) {
+  if (pAnswered) return;
+  pAnswered = true;
+  const item = QUESTIONS[studyQs[pIdx]];
+  [...$("pChoices").children].forEach((b, i) => {
+    b.disabled = true;
+    if (i === item.answer) b.classList.add("correct");
+    else if (i === idx) b.classList.add("wrong");
+  });
+  const right = idx === item.answer;
+  if (right) {
+    pStreak++;
+    recordAnswer(studyQs[pIdx], true);
+    // 10 points, plus 5 bonus for each answer in a row past the first.
+    pPoints += 10 + Math.min(pStreak - 1, 5) * 5;
+    cheer();
+  } else {
+    pStreak = 0;
+    recordAnswer(studyQs[pIdx], false);
+    oops();
+  }
+  const fb = $("pFeedback");
+  fb.innerHTML = "";
+  const strong = document.createElement("strong");
+  let headline;
+  if (right) {
+    headline = pStreak >= 3 ? `Correct! ${pStreak} in a row.` : "Correct!";
+  } else {
+    headline = "Not quite. The answer is: " + item.choices[item.answer];
+  }
+  strong.textContent = headline;
+  const span = document.createElement("span");
+  span.textContent = item.why || "";
+  fb.append(strong, span);
+  fb.classList.remove("hidden");
+  $("pStreak").textContent = `Streak ${pStreak}`;
+  $("pPoints").textContent = `Points ${pPoints}`;
+  $("pNext").disabled = false;
+  $("pNext").focus();
+}
+$("pNext").addEventListener("click", () => {
+  pIdx = pIdx === studyQs.length - 1 ? 0 : pIdx + 1;
+  renderPractice();
+});
+
+/* ===== LEARNING CENTER ===== */
+const LESSONS = [
+  { title: "Constantinople and the Byzantine Empire", topic: "Byzantine Empire",
+    summary: "How geography made Constantinople rich and hard to attack.",
+    points: [
+      "The Byzantine Empire was the eastern Roman Empire. It lasted from 395 to 1452 CE and included parts of Europe, Asia, and Africa.",
+      "In 330 CE, Constantine moved the capital from Rome to Byzantium. It was later renamed Constantinople, today's Istanbul.",
+      "The city had a great harbor and sat between the Black Sea and the Mediterranean. Whoever controlled it and the Bosporus controlled trade between Europe and Asia.",
+      "Defenses: water on three sides, a 500-yard chain across the harbor, and a three-tier wall about 13 miles long with 96 towers.",
+      "Water came through a 400-mile aqueduct built by Emperor Valens and was stored in the Basilica Cistern.",
+      "The empire was Christian, used Roman law and technology, and kept Greek language and literature alive."
+    ] },
+  { title: "Justinian and Theodora", topic: "Justinian",
+    summary: "The emperor whose law code still shapes modern law.",
+    points: [
+      "Justinian (483 to 565 CE) was born a peasant, rose through the army, and is considered the greatest Byzantine emperor.",
+      "Theodora, a former performer, married Justinian and co-ruled with him. She backed laws that helped the poor, the homeless, and slaves, and she supported women's rights.",
+      "Justinian organized and simplified Roman law into a clear code. It became the basis of modern Western law.",
+      "The Nika riots of 532 CE burned parts of Constantinople. Justinian rebuilt it, including the Hagia Sophia.",
+      "He tried to restore Rome's former glory through wars, but the lands were not held after his death."
+    ] },
+  { title: "The Church Splits", topic: "Church Split",
+    summary: "How the Catholic and Orthodox churches drifted apart.",
+    points: [
+      "The Roman Catholic Church was led by the pope in Rome. The Eastern Orthodox Church was led by the patriarch in Constantinople.",
+      "In 730 CE, Emperor Leo III banned icons, which started the Iconoclasm. The pope opposed the ban.",
+      "In 800 CE, the pope crowned Charlemagne Holy Roman Emperor. Constantinople saw this as a challenge to its power.",
+      "In 1054 CE, the pope and the patriarch excommunicated each other's leaders. This is the East-West Schism.",
+      "The split was not mended until 1964."
+    ] },
+  { title: "The Arabian Peninsula and Muhammad", topic: "Arabian Peninsula",
+    summary: "Geography, trade, and the founding of Islam.",
+    points: [
+      "Harsh desert geography kept Arabs in clans and tribes instead of city-states. They still shared religion, language, and culture.",
+      "Muslim cities centered on a souk (marketplace) and a mosque (place of prayer).",
+      "Muhammad was born into the divided peninsula and worked as a trader. He married Khadijah, and he began receiving messages from the angel Gabriel.",
+      "A caliph was the Muslim ruler who came to power after Muhammad died.",
+      "Islam, Judaism, and Christianity all believe in one God and trace their origin to the prophet Abraham. The Qur'an and the Sunnah guide Muslims."
+    ] },
+  { title: "The Islamic Empire", topic: "Islamic Empire",
+    summary: "Dynasties, the Sunni and Shi'a split, and the fall of Baghdad.",
+    points: [
+      "The Umayyad caliphs spread Islam but let conquered people keep their own religion.",
+      "The Sunni and Shi'a split came from a dispute over who should lead. Today about 85% of Muslims are Sunni.",
+      "The Abbasid dynasty (750 to 1258 CE) was centered in Baghdad and reached a high point of learning and trade.",
+      "The Seljuk Turks invaded in 1055 CE and ruled as sultans. Their expansion led to conflict with Byzantium and the Crusades.",
+      "The Mongols sacked Baghdad in 1258 CE, which ended the Abbasid empire."
+    ] },
+  { title: "The Crusades and Jerusalem", topic: "Crusades",
+    summary: "Why three faiths fought over one city.",
+    points: [
+      "The Crusades were Christian military campaigns to take the Holy Land from Muslim control.",
+      "Jerusalem is holy to Christians (where Jesus was crucified), to Muslims (where Muhammad ascended to heaven), and to Jews (where the Great Temple once stood).",
+      "Saladin (Salah al-Din) captured Jerusalem in 1187 CE. In the Third Crusade he fought King Richard I to a stalemate.",
+      "The Crusades increased violence and mistrust, but they also brought trade and new ideas between Europe and the Muslim world."
+    ] },
+  { title: "Muslim Innovations", topic: "Innovations",
+    summary: "Math, medicine, navigation, and learning that spread across three continents.",
+    points: [
+      "Muslim scholars translated and studied Greek texts. Paper, libraries, and rulers who supported scholars helped learning grow.",
+      "Al-Khwarizmi's books introduced algebra and Hindu-Arabic numerals to Europe. Zero, from India, made place-value math possible.",
+      "Ibn Sina's The Canon of Medicine was used as a medical textbook in Europe for centuries.",
+      "Navigation tools included the astrolabe, the compass, guidebooks, and maps.",
+      "One Thousand and One Nights had roots in India and Persia. Geometric and floral designs decorated art, and chess and polo were popular pastimes."
+    ] }
+];
+
+let lesson = null, lessonMode = "asap", steps = [], stepIdx = 0, lessonScore = 0, answeredQ = {};
+
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+
+function renderLearn() {
+  const list = $("lessonList");
+  list.innerHTML = "";
+  LESSONS.forEach((L, idx) => {
+    const qCount = QUESTIONS.filter(q => q.topic === L.topic).length;
+    const cCount = CARDS.filter(c => c.topic === L.topic).length;
+    const box = el("div", "", "lesson");
+    const row = el("div", "", "row");
+    row.style.marginTop = "0";
+    const asap = el("button", "ASAP");
+    asap.addEventListener("click", () => openLesson(idx, "asap"));
+    const slow = el("button", "Take your time", "primary");
+    slow.addEventListener("click", () => openLesson(idx, "slow"));
+    row.append(asap, slow);
+    box.append(
+      el("h3", `${idx + 1}. ${L.title}`),
+      el("p", L.summary),
+      el("p", `${L.points.length} key points · ${cCount} flashcards · ${qCount} questions`, "hint"),
+      row
+    );
+    list.appendChild(box);
+  });
+}
+
+function openLesson(idx, mode) {
+  lesson = LESSONS[idx];
+  lessonMode = mode;
+  stepIdx = 0;
+  lessonScore = 0;
+  answeredQ = {};
+  const qis = QUESTIONS.map((_, i) => i).filter(i => QUESTIONS[i].topic === lesson.topic);
+  const cards = CARDS.filter(c => c.topic === lesson.topic);
+  if (mode === "asap") {
+    steps = [{ type: "summary" }, ...qis.map(qi => ({ type: "quiz", qi })), { type: "done" }];
+  } else {
+    steps = [
+      ...lesson.points.map((text, i) => ({ type: "point", text, n: i + 1, total: lesson.points.length })),
+      ...cards.map(card => ({ type: "card", card })),
+      ...qis.map(qi => ({ type: "quiz", qi })),
+      { type: "done" }
+    ];
+  }
+  show("lessonView");
+  renderStep();
+}
+
+function setNext(enabled) {
+  $("lessonNext").disabled = !enabled;
+}
+
+function renderStep() {
+  const s = steps[stepIdx];
+  const body = $("lessonBody");
+  body.innerHTML = "";
+  $("lessonNav").classList.toggle("hidden", s.type === "done");
+  $("lessonFill").style.width = `${(stepIdx / steps.length) * 100}%`;
+  $("lessonCount").textContent = `${lesson.title} · ${stepIdx + 1} of ${steps.length}`;
+  $("lessonBack").disabled = stepIdx === 0;
+  $("lessonNext").textContent = stepIdx === steps.length - 1 ? "Finish" : "Next";
+  setNext(true);
+  replay($("lessonBox"), "pop");
+
+  if (s.type === "summary") {
+    const ul = el("ul");
+    lesson.points.forEach(t => ul.appendChild(el("li", t)));
+    body.append(el("div", "Key points", "meta"), ul, el("p", "Next up: a quick check on this lesson.", "hint"));
+
+  } else if (s.type === "point") {
+    body.append(el("div", `Point ${s.n} of ${s.total}`, "meta"), el("p", s.text, "question"));
+
+  } else if (s.type === "card") {
+    const answer = el("p", s.card.def);
+    answer.classList.add("hidden");
+    const reveal = el("button", "Show answer");
+    setNext(false);
+    reveal.addEventListener("click", () => {
+      answer.classList.remove("hidden");
+      reveal.disabled = true;
+      setNext(true);
+    });
+    body.append(el("div", "Flashcard", "meta"), el("p", s.card.term, "question"), reveal, answer);
+
+  } else if (s.type === "quiz") {
+    const item = QUESTIONS[s.qi];
+    const choices = el("div", "", "choices");
+    const fb = el("div", "", "feedback hidden");
+    setNext(false);
+    item.choices.forEach((text, idx) => {
+      const b = el("button", text, "choice");
+      b.addEventListener("click", () => {
+        const right = idx === item.answer;
+        [...choices.children].forEach((c, i) => {
+          c.disabled = true;
+          if (i === item.answer) c.classList.add("correct");
+          else if (i === idx) c.classList.add("wrong");
+        });
+        if (right && !answeredQ[s.qi]) { lessonScore++; cheer(); }
+        else if (!right) oops();
+        if (!answeredQ[s.qi]) recordAnswer(s.qi, right);
+        answeredQ[s.qi] = true;
+        fb.innerHTML = "";
+        fb.append(
+          el("strong", right ? "Correct." : "Not quite. The answer is: " + item.choices[item.answer]),
+          el("span", item.why)
+        );
+        fb.classList.remove("hidden");
+        setNext(true);
+      });
+      choices.appendChild(b);
+    });
+    body.append(el("div", "Quick check", "meta"), el("p", item.q, "question"), choices, fb);
+
+  } else if (s.type === "done") {
+    const quizTotal = steps.filter(x => x.type === "quiz").length;
+    const pct = quizTotal ? Math.round((lessonScore / quizTotal) * 100) : 100;
+    const row = el("div", "", "row");
+    const again = el("button", "Replay this lesson");
+    again.addEventListener("click", () => openLesson(LESSONS.indexOf(lesson), lessonMode));
+    const all = el("button", "All lessons", "primary");
+    all.addEventListener("click", () => { renderLearn(); show("learnView"); });
+    row.append(again, all);
+    body.append(
+      el("div", "Lesson complete", "meta"),
+      el("div", `${lessonScore} / ${quizTotal}`, "result-big"),
+      el("p", pct >= 70 ? "Nice work. Move on to the next lesson, or run this one again." : "Run this one again, or review the key points first."),
+      row
+    );
+  }
+}
+
+$("startLearn").addEventListener("click", () => { renderLearn(); show("learnView"); });
+$("learnBack").addEventListener("click", () => show("startView"));
+$("lessonQuit").addEventListener("click", () => { renderLearn(); show("learnView"); });
+$("lessonNext").addEventListener("click", () => {
+  if (stepIdx < steps.length - 1) { stepIdx++; renderStep(); }
+});
+$("lessonBack").addEventListener("click", () => {
+  if (stepIdx > 0) { stepIdx--; renderStep(); }
+});
+
+/* ===== TEST PREDICTOR =====
+   Keeps a per-browser log of answers from practice, lessons, and tests.
+   The prediction is the average estimated chance of getting each question right.
+   Unanswered questions count as a 50% chance. */
+const HISTORY_KEY = "byzantineGame.answerLog.v1";
+let answerLog = {};
+try { answerLog = JSON.parse(localStorage.getItem(HISTORY_KEY)) || {}; } catch (e) { answerLog = {}; }
+let lastPrediction = 0;
+
+function saveAnswerLog() {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(answerLog)); } catch (e) { /* storage blocked: keep it in memory only */ }
+}
+function recordAnswer(qi, correct) {
+  const r = answerLog[qi] || { seen: 0, correct: 0 };
+  r.seen++;
+  if (correct) r.correct++;
+  answerLog[qi] = r;
+  saveAnswerLog();
+}
+function predictScore() {
+  let total = 0, studied = 0;
+  QUESTIONS.forEach((_, qi) => {
+    const r = answerLog[qi];
+    if (r) { studied++; total += (r.correct + 1) / (r.seen + 2); }
+    else total += 0.5;
+  });
+  return { pct: Math.round((total / QUESTIONS.length) * 100), studied };
+}
+function renderPrediction() {
+  const p = predictScore();
+  $("predictLine").textContent = p.studied
+    ? `Predicted test score: ${p.pct}%, based on ${p.studied} of ${QUESTIONS.length} questions you have answered.`
+    : "Predicted test score: not enough data yet. Practice or take the test to get a prediction.";
+}
+
+/* ===== ESSAY PRACTICE =====
+   Write a short answer, then check it against the key points. Nothing is graded. */
+/* The four essential questions from the packet. Each has key ideas the grader looks for.
+   A key idea counts as covered if the essay includes any of its keywords. */
+const ESSAYS = [
+  { prompt: "How did the Byzantine Empire get rich and powerful because of its geography?", source: "Lesson 28", minWords: 60,
+    ideas: [
+      { label: "A defensible site with a great harbor", any: ["harbor", "harbour", "peninsula", "location", "defensible", "strategic"] },
+      { label: "Control of trade between Europe and Asia", any: ["trade", "route", "bosporus", "strait"] },
+      { label: "Defense: water on three sides, the chain, or the walls", any: ["water", "wall", "chain", "moat", "defend", "protect"] },
+      { label: "Wealth from access to the Black and Mediterranean seas", any: ["rich", "wealth", "money", "sea", "port"] }
+    ] },
+  { prompt: "What is the Byzantine Empire's enduring impact on law and Christianity?", source: "Lesson 28", minWords: 60,
+    ideas: [
+      { label: "Justinian's Code and Roman law", any: ["law", "code"] },
+      { label: "Its basis for modern legal systems", any: ["modern", "today", "basis", "western", "legal system"] },
+      { label: "Christianity: the Eastern Orthodox Church or a Christian empire", any: ["christian", "orthodox", "church", "theodosius"] },
+      { label: "Preserving Greek culture and literature", any: ["greek", "literature", "preserv"] }
+    ] },
+  { prompt: "What important innovations and adaptations did medieval Muslims make?", source: "Lesson 29", minWords: 60,
+    ideas: [
+      { label: "Math: algebra, Hindu-Arabic numerals, or zero", any: ["algebra", "numeral", "zero", "math"] },
+      { label: "Medicine: hospitals, surgery, or Ibn Sina's Canon", any: ["medicine", "hospital", "surgery", "ibn sina", "avicenna", "canon"] },
+      { label: "Navigation or astronomy: astrolabe, compass, maps, observatories", any: ["astrolabe", "compass", "navigat", "astronom", "map", "observatory"] },
+      { label: "Learning: translating Greek texts, libraries, or paper", any: ["translat", "greek", "library", "libraries", "paper", "scholar"] },
+      { label: "Culture: literature, bookmaking, art, music, or textiles", any: ["literature", "book", "art", "music", "textile", "design", "stor"] }
+    ] },
+  { prompt: "How did the Crusades affect the lives of Christians, Muslims, and Jews?", source: "Lesson 30", minWords: 60,
+    ideas: [
+      { label: "Christians: the Crusades aimed to take the Holy Land", any: ["christian"] },
+      { label: "Muslims: they defended Jerusalem, such as under Saladin", any: ["muslim", "saladin"] },
+      { label: "Jews: Jerusalem is holy to them, and the Temple stood there", any: ["jew", "temple"] },
+      { label: "Violence, war, or mistrust between the groups", any: ["violence", "war", "conflict", "fight", "mistrust", "stalemate", "killed", "died"] },
+      { label: "Trade and new ideas exchanged between the groups", any: ["trade", "ideas", "exchange", "culture"] }
+    ] }
+];
+
+let essayIdx = 0;
+const essayDrafts = {};
+
+function updateEssayWords() {
+  const n = $("essayText").value.trim().split(/\s+/).filter(Boolean).length;
+  $("essayWords").textContent = `${n} word${n === 1 ? "" : "s"}`;
+}
+
+function renderEssay() {
+  const e = ESSAYS[essayIdx];
+  $("essayCount").textContent = `Prompt ${essayIdx + 1} of ${ESSAYS.length}`;
+  $("essayPrompt").textContent = e.prompt;
+  $("essayText").value = essayDrafts[essayIdx] || "";
+  updateEssayWords();
+
+  const pts = $("essayPoints");
+  pts.innerHTML = "";
+  pts.classList.add("hidden");
+  pts.append(el("div", "Key points. Check off the ones your answer covers.", "meta"));
+  e.ideas.forEach(idea => {
+    const lab = el("label", "");
+    lab.style.display = "block";
+    lab.style.margin = "0 0 8px";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    lab.append(cb, " " + idea.label);
+    pts.appendChild(lab);
+  });
+  $("essayShow").textContent = "Show key points";
+  $("essayResult").classList.add("hidden");
+  $("essayPrev").disabled = essayIdx === 0;
+  $("essayNext").disabled = essayIdx === ESSAYS.length - 1;
+}
+
+$("essayText").addEventListener("input", () => {
+  essayDrafts[essayIdx] = $("essayText").value;
+  updateEssayWords();
+});
+$("essayShow").addEventListener("click", () => {
+  const nowHidden = $("essayPoints").classList.toggle("hidden");
+  $("essayShow").textContent = nowHidden ? "Show key points" : "Hide key points";
+});
+$("essayPrev").addEventListener("click", () => {
+  if (essayIdx > 0) { essayIdx--; renderEssay(); }
+});
+$("essayNext").addEventListener("click", () => {
+  if (essayIdx < ESSAYS.length - 1) { essayIdx++; renderEssay(); }
+});
+
+/* ===== ESSAY GRADER =====
+   Checks which key ideas appear in the essay, by keyword. It is an automatic check, not a teacher's grade. */
+function gradeEssay(text, e) {
+  const t = text.toLowerCase();
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const hit = e.ideas.filter(idea => idea.any.some(k => t.includes(k)));
+  const missed = e.ideas.filter(idea => !hit.includes(idea));
+  let pct = Math.round((hit.length / e.ideas.length) * 100);
+  if (words < e.minWords) pct = Math.min(pct, 70);
+  return { words, hit, missed, pct };
+}
+function letterFor(p) {
+  if (p >= 90) return "A";
+  if (p >= 80) return "B";
+  if (p >= 70) return "C";
+  if (p >= 60) return "D";
+  return "F";
+}
+$("essayGrade").addEventListener("click", () => {
+  const e = ESSAYS[essayIdx];
+  const r = gradeEssay($("essayText").value, e);
+  const box = $("essayResult");
+  box.innerHTML = "";
+  box.append(
+    el("strong", `Score: ${r.pct}% (${letterFor(r.pct)})`),
+    el("p", `${r.hit.length} of ${e.ideas.length} key ideas covered. ${r.words} words.`)
+  );
+  if (r.words < e.minWords) box.append(el("p", `Under ${e.minWords} words, so the score is capped at 70%.`, "hint"));
+  if (r.hit.length) {
+    box.append(el("div", "Covered", "meta"));
+    const ul = el("ul");
+    r.hit.forEach(i => ul.appendChild(el("li", i.label)));
+    box.appendChild(ul);
+  }
+  if (r.missed.length) {
+    box.append(el("div", "Missing", "meta"));
+    const ul = el("ul");
+    r.missed.forEach(i => ul.appendChild(el("li", i.label)));
+    box.appendChild(ul);
+  }
+  box.append(el("p", "Automatic check of key ideas. It is not a teacher's grade.", "hint"));
+  box.classList.remove("hidden");
+});
+
+/* ===== INIT ===== */
+show("startView");
+</script>
+</body>
+</html>

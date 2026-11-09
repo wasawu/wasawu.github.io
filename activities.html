@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Byzantine Activities</title>
+<style>
+/* Plain black on white, like the study game. */
+body {
+  margin: 0;
+  background: #fff;
+  color: #000;
+  font: 17px/1.5 Arial, Helvetica, sans-serif;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 24px;
+  padding-bottom: 40px;
+  overflow-x: hidden;
+}
+main { max-width: 620px; margin: 0 auto; }
+h1 { font-size: 1.9rem; margin: 0 0 14px; text-transform: uppercase; }
+h2 { font-size: 1.1rem; margin: 0 0 10px; text-transform: uppercase; }
+button {
+  font: inherit; color: #000; background: #fff;
+  border: 3px solid #000; border-radius: 0;
+  padding: 10px 14px; min-height: 46px; cursor: pointer; font-weight: bold;
+  text-align: left;
+}
+button:focus-visible { outline: 3px dashed #000; outline-offset: 3px; }
+button.primary, button.on { background: #000; color: #fff; }
+button:disabled { opacity: 0.35; cursor: default; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.box { border: 3px solid #000; padding: 18px; margin-bottom: 14px; }
+.stack { display: grid; gap: 8px; margin-bottom: 14px; }
+.stack button { width: 100%; }
+.hint { font-size: 0.92rem; margin: 0 0 12px; }
+.note { font-weight: bold; margin: 10px 0 0; }
+.hidden { display: none !important; }
+.mapwrap { position: relative; border: 3px solid #000; }
+.mapwrap img { display: block; width: 100%; height: auto; cursor: crosshair; }
+.clue { font-size: 1.2rem; font-weight: bold; margin: 0 0 14px; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">&larr; Back to hub</a></p>
+  <h1>Byzantine Activities</h1>
+  <p class="hint">Three quick activities from the packet. Pick one.</p>
+
+  <nav class="tabs">
+    <button id="tabTimeline" class="on">Timeline</button>
+    <button id="tabMap">Map</button>
+    <button id="tabPeople">Who said it</button>
+  </nav>
+
+  <!-- TIMELINE -->
+  <section id="timelineView">
+    <h2>Put these in order, earliest first</h2>
+    <p class="hint">Tap an event to add it to your timeline. Tap a picked event to take it back.</p>
+    <div class="stack" id="tlBank"></div>
+    <h2>Your timeline</h2>
+    <div class="stack" id="tlPicked"></div>
+    <div class="stack" style="grid-template-columns: 1fr 1fr;">
+      <button class="primary" id="tlCheck">Check order</button>
+      <button id="tlReset">Start over</button>
+    </div>
+    <div class="box hidden" id="tlResult"></div>
+  </section>
+
+  <!-- MAP -->
+  <section id="mapView" class="hidden">
+    <h2 id="mapPrompt"></h2>
+    <p class="hint">Click the spot on the map. Five places, one at a time.</p>
+    <div class="mapwrap" id="mapWrap">
+      <img id="mapImg" src="map.jpg" alt="Map of the Arabian Peninsula and surrounding lands">
+    </div>
+    <p class="note" id="mapFeedback"></p>
+    <div class="stack" style="margin-top:14px"><button id="mapReset">Start over</button></div>
+  </section>
+
+  <!-- WHO SAID IT -->
+  <section id="peopleView" class="hidden">
+    <div class="box">
+      <div class="hint" id="peopleCount"></div>
+      <p class="clue" id="peopleClue"></p>
+      <div class="stack" id="peopleChoices"></div>
+      <p class="note" id="peopleFeedback"></p>
+      <div class="stack" style="margin-top:12px"><button id="peopleNext" class="primary" disabled>Next</button></div>
+    </div>
+    <p class="note hidden" id="peopleScore"></p>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ===== TABS ===== */
+const TABS = { timeline: "timelineView", map: "mapView", people: "peopleView" };
+function showTab(name) {
+  Object.entries(TABS).forEach(([k, id]) => $(id).classList.toggle("hidden", k !== name));
+  $("tabTimeline").classList.toggle("on", name === "timeline");
+  $("tabMap").classList.toggle("on", name === "map");
+  $("tabPeople").classList.toggle("on", name === "people");
+}
+$("tabTimeline").addEventListener("click", () => showTab("timeline"));
+$("tabMap").addEventListener("click", () => showTab("map"));
+$("tabPeople").addEventListener("click", () => showTab("people"));
+
+/* ===== TIMELINE ===== */
+const TL = [
+  { date: 330, text: "Constantine moves the capital to Byzantium" },
+  { date: 532, text: "Nika riots burn parts of Constantinople" },
+  { date: 730, text: "Emperor Leo III bans icons" },
+  { date: 800, text: "The pope crowns Charlemagne Holy Roman Emperor" },
+  { date: 1054, text: "The East-West Schism splits the churches" },
+  { date: 1187, text: "Saladin captures Jerusalem" },
+  { date: 1258, text: "The Mongols sack Baghdad, ending the Abbasid empire" }
+];
+let tlOrder = [];
+let tlPicked = [];
+
+function startTimeline() {
+  tlOrder = shuffle(TL.map((_, i) => i));
+  tlPicked = [];
+  $("tlResult").classList.add("hidden");
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const bank = $("tlBank");
+  bank.innerHTML = "";
+  tlOrder.filter(i => !tlPicked.includes(i)).forEach(i => {
+    const b = el("button", TL[i].text);
+    b.addEventListener("click", () => {
+      tlPicked.push(i);
+      $("tlResult").classList.add("hidden");
+      renderTimeline();
+    });
+    bank.appendChild(b);
+  });
+  const picked = $("tlPicked");
+  picked.innerHTML = "";
+  tlPicked.forEach((i, pos) => {
+    const b = el("button", `${pos + 1}. ${TL[i].text}`, "on");
+    b.addEventListener("click", () => {
+      tlPicked.splice(pos, 1);
+      $("tlResult").classList.add("hidden");
+      renderTimeline();
+    });
+    picked.appendChild(b);
+  });
+}
+
+$("tlCheck").addEventListener("click", () => {
+  const box = $("tlResult");
+  box.innerHTML = "";
+  if (tlPicked.length < TL.length) {
+    box.append(el("p", `Place all ${TL.length} events first. You have ${tlPicked.length}.`));
+    box.classList.remove("hidden");
+    return;
+  }
+  const dates = tlPicked.map(i => TL[i].date);
+  const inOrder = dates.every((d, k) => k === 0 || dates[k - 1] <= d);
+  box.append(el("strong", inOrder ? "Every event is in the right order." : "Not quite. Here is the right order:"));
+  if (!inOrder) {
+    const sorted = TL.slice().sort((a, b) => a.date - b.date);
+    const ol = el("ol");
+    sorted.forEach(ev => ol.appendChild(el("li", `${ev.date} CE: ${ev.text}`)));
+    box.appendChild(ol);
+  }
+  box.classList.remove("hidden");
+});
+$("tlReset").addEventListener("click", startTimeline);
+
+/* ===== MAP ===== */
+// Target spots, in pixels of the 1200 x 1600 photo of the packet's map.
+// Each spot counts as a hit within 60 pixels of its center.
+const MAP_TARGETS = [
+  { name: "Constantinople", x: 515, y: 395 },
+  { name: "Baghdad", x: 786, y: 470 },
+  { name: "Cairo", x: 612, y: 548 },
+  { name: "Mecca", x: 742, y: 680 },
+  { name: "Jerusalem", x: 662, y: 522 }
+];
+let mapIdx = 0;
+let mapMisses = 0;
+
+function renderMapPrompt() {
+  if (mapIdx >= MAP_TARGETS.length) {
+    $("mapPrompt").textContent = "All five found";
+    $("mapFeedback").textContent = `Wrong clicks: ${mapMisses}`;
+    return;
+  }
+  $("mapPrompt").textContent = `Click ${MAP_TARGETS[mapIdx].name}`;
+}
+
+$("mapImg").addEventListener("click", e => {
+  if (mapIdx >= MAP_TARGETS.length) return;
+  const img = $("mapImg");
+  const r = img.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * img.naturalWidth;
+  const y = (e.clientY - r.top) / r.height * img.naturalHeight;
+  const t = MAP_TARGETS[mapIdx];
+  if (Math.hypot(x - t.x, y - t.y) <= 60) {
+    $("mapFeedback").textContent = `Correct: ${t.name}.`;
+    mapIdx++;
+  } else {
+    mapMisses++;
+    $("mapFeedback").textContent = "Not quite. Try again.";
+  }
+  renderMapPrompt();
+});
+$("mapReset").addEventListener("click", () => {
+  mapIdx = 0;
+  mapMisses = 0;
+  $("mapFeedback").textContent = "";
+  renderMapPrompt();
+});
+
+/* ===== WHO SAID IT ===== */
+const PEOPLE = ["Justinian", "Theodora", "Saladin", "Ibn Sina", "al-Khwarizmi", "Leo III"];
+const CLUES = [
+  { clue: "I organized Roman law into one clear code.", who: "Justinian" },
+  { clue: "I was born a peasant and co-ruled the empire with my husband.", who: "Theodora" },
+  { clue: "I captured Jerusalem from the Christians in 1187.", who: "Saladin" },
+  { clue: "I wrote The Canon of Medicine.", who: "Ibn Sina" },
+  { clue: "My books brought algebra and Hindu-Arabic numerals to Europe.", who: "al-Khwarizmi" },
+  { clue: "In 730 CE I banned icons, which started the Iconoclasm.", who: "Leo III" }
+];
+let peopleOrder = [];
+let peopleIdx = 0;
+let peopleRight = 0;
+let peopleAnswered = false;
+
+function startPeople() {
+  peopleOrder = shuffle(CLUES.map((_, i) => i));
+  peopleIdx = 0;
+  peopleRight = 0;
+  $("peopleScore").classList.add("hidden");
+  renderPeople();
+}
+
+function renderPeople() {
+  const item = CLUES[peopleOrder[peopleIdx]];
+  peopleAnswered = false;
+  $("peopleCount").textContent = `Clue ${peopleIdx + 1} of ${CLUES.length}`;
+  $("peopleClue").textContent = item.clue;
+  $("peopleFeedback").textContent = "";
+  $("peopleNext").disabled = true;
+  $("peopleNext").textContent = peopleIdx === CLUES.length - 1 ? "See score" : "Next";
+
+  // Four choices: the right person plus three others.
+  const others = shuffle(PEOPLE.filter(p => p !== item.who)).slice(0, 3);
+  const choices = shuffle([item.who, ...others]);
+  const box = $("peopleChoices");
+  box.innerHTML = "";
+  choices.forEach(name => {
+    const b = el("button", name);
+    b.addEventListener("click", () => answerPeople(name, b));
+    box.appendChild(b);
+  });
+}
+
+function answerPeople(name, button) {
+  if (peopleAnswered) return;
+  peopleAnswered = true;
+  const item = CLUES[peopleOrder[peopleIdx]];
+  const right = name === item.who;
+  if (right) peopleRight++;
+  [...$("peopleChoices").children].forEach(b => {
+    b.disabled = true;
+    if (b.textContent === item.who) b.classList.add("on");
+  });
+  $("peopleFeedback").textContent = right ? "Correct." : `Not quite. It was ${item.who}.`;
+  $("peopleNext").disabled = false;
+}
+
+$("peopleNext").addEventListener("click", () => {
+  if (peopleIdx < CLUES.length - 1) {
+    peopleIdx++;
+    renderPeople();
+  } else {
+    $("peopleClue").textContent = "Done";
+    $("peopleChoices").innerHTML = "";
+    $("peopleFeedback").textContent = "";
+    $("peopleNext").disabled = true;
+    $("peopleCount").textContent = "";
+    $("peopleScore").textContent = `You got ${peopleRight} of ${CLUES.length}.`;
+    $("peopleScore").classList.remove("hidden");
+    const again = el("button", "Play again", "primary");
+    again.addEventListener("click", startPeople);
+    $("peopleChoices").appendChild(again);
+  }
+});
+
+/* ===== INIT ===== */
+startTimeline();
+renderMapPrompt();
+startPeople();
+</script>
+</body>
+</html>
