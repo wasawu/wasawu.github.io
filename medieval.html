@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Medieval Study Game</title>
+<style>
+/* Plain black on white. No color scheme. Chunky borders and small pop animations for fun. */
+body {
+  margin: 0;
+  background: #fff;
+  color: #000;
+  font: 17px/1.5 Arial, Helvetica, sans-serif;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 24px;
+  padding-bottom: 40px;
+  overflow-x: hidden;
+}
+main { max-width: 620px; margin: 0 auto; }
+h1 { font-size: 1.9rem; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.02em; }
+.tag { margin: 0 0 18px; }
+h2 { font-size: 1.15rem; margin: 18px 0 10px; text-transform: uppercase; }
+button {
+  font: inherit;
+  color: #000;
+  background: #fff;
+  border: 3px solid #000;
+  border-radius: 0;
+  padding: 10px 16px;
+  min-height: 46px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform .08s ease;
+}
+button:active:not(:disabled) { transform: translate(2px, 2px); }
+button:focus-visible { outline: 3px dashed #000; outline-offset: 3px; }
+button.primary { background: #000; color: #fff; }
+button.active { background: #000; color: #fff; }
+button:disabled { opacity: 0.35; cursor: default; }
+.big { display: block; width: 100%; text-align: left; margin-bottom: 12px; padding: 18px; font-size: 1.15rem; }
+.big small { display: block; font-size: 0.92rem; font-weight: normal; margin-top: 6px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.spacer { margin-left: auto; }
+.bar { height: 14px; border: 3px solid #000; margin-bottom: 16px; }
+.bar > div { height: 100%; width: 0; background: #000; transition: width .3s ease; }
+.box { border: 3px solid #000; padding: 20px; }
+.meta { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; font-weight: bold; }
+.question { font-size: 1.25rem; font-weight: bold; margin: 0 0 16px; }
+.choices { display: grid; gap: 10px; }
+.choice { text-align: left; width: 100%; font-weight: normal; }
+.choice.correct { border-width: 5px; font-weight: bold; }
+.choice.wrong { text-decoration: line-through; }
+.feedback { margin-top: 16px; padding: 12px; border: 3px solid #000; }
+.feedback strong { display: block; margin-bottom: 4px; font-size: 1.1rem; }
+.row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+.num { font-variant-numeric: tabular-nums; font-weight: bold; }
+.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.stat { border: 3px solid #000; padding: 6px 12px; font-weight: bold; font-variant-numeric: tabular-nums; }
+.timer { font-size: 2.2rem; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1; }
+.timer.low { text-decoration: underline; }
+.flash { min-height: 200px; display: flex; flex-direction: column; justify-content: center; text-align: center; cursor: pointer; }
+.hint { font-size: 0.92rem; }
+.hidden { display: none !important; }
+.rank { font-size: 2rem; font-weight: bold; text-transform: uppercase; line-height: 1.1; margin: 8px 0; }
+.score-big { font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+ul.topics { padding-left: 20px; margin: 8px 0 16px; }
+.lesson { border: 3px solid #000; padding: 16px; margin-bottom: 14px; }
+.lesson h3 { margin: 0 0 6px; font-size: 1.1rem; text-transform: uppercase; }
+.pop { animation: pop .35s ease; }
+@keyframes pop { 0% { transform: scale(.94); } 60% { transform: scale(1.03); } 100% { transform: scale(1); } }
+.shake { animation: shake .35s ease; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .pop, .shake { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">&larr; Back to hub</a></p>
+  <h1>Medieval Study Game</h1>
+  <p class="tag">Beat the quiz. Clear the deck. Become a Legend of the Middle Ages.</p>
+
+  <!-- START -->
+  <section id="startView">
+    <h2>Pick your path</h2>
+    <p class="hint" id="predictLine" style="margin-top:0"></p>
+    <p class="hint">These questions were made with computer generation, not taken from Mr. Yingling's test.</p>
+    <button class="big" id="startLearn">Learning Center
+      <small>Lessons you can rush through (ASAP) or take at your own pace.</small>
+    </button>
+    <button class="big" id="startTest">Take the test
+      <small>20 seconds per question. No hints. Find out your rank and what to study next.</small>
+    </button>
+    <button class="big" id="startStudy">Jump into studying
+      <small>Flashcards, streaks, and practice questions with answers right away.</small>
+    </button>
+  </section>
+
+  <!-- TEST -->
+  <section id="testView" class="hidden">
+    <div class="tabs">
+      <span class="num" id="testCount"></span>
+      <button class="spacer" id="testQuit">Quit</button>
+    </div>
+    <p class="hint">These questions were made with computer generation, not taken from Mr. Yingling's test.</p>
+    <div class="bar"><div id="testFill"></div></div>
+    <div class="box" id="testBox">
+      <div class="row" style="margin-top:0">
+        <div class="meta" id="testTopic"></div>
+        <div class="timer" id="testTimer">20</div>
+      </div>
+      <p class="question" id="testText"></p>
+      <div class="choices" id="testChoices"></div>
+      <div class="row">
+        <span class="hint">Pick an answer, then move on.</span>
+        <button class="primary" id="testNext" disabled>Next</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEST RESULTS -->
+  <section id="resultsView" class="hidden">
+    <div class="box" style="text-align:center">
+      <div class="meta">Your predicted test score</div>
+      <div class="score-big" id="predBig"></div>
+      <div class="hint" id="predNote"></div>
+      <div class="hint" id="testScoreLine"></div>
+    </div>
+    <div class="row">
+      <button class="primary" id="studyMissed">Study what I missed</button>
+      <button id="studyAll">Study everything</button>
+      <button id="retake">Take it again</button>
+      <button id="backStart">Home</button>
+    </div>
+  </section>
+
+  <!-- LEARNING CENTER -->
+  <section id="learnView" class="hidden">
+    <div class="tabs">
+      <span class="meta" style="margin:0">Learning Center</span>
+      <button class="spacer" id="learnBack">Home</button>
+    </div>
+    <p class="hint">Pick a lesson. ASAP shows the key points and a quick check. Take your time walks through each point, then the flashcards, then the questions.</p>
+    <div id="lessonList"></div>
+  </section>
+
+  <!-- LESSON -->
+  <section id="lessonView" class="hidden">
+    <div class="tabs">
+      <button id="lessonQuit">Exit lesson</button>
+    </div>
+    <div class="bar"><div id="lessonFill"></div></div>
+    <div class="hint" id="lessonCount" style="margin-bottom:8px"></div>
+    <div class="box" id="lessonBox"><div id="lessonBody"></div></div>
+    <div class="row" id="lessonNav">
+      <button id="lessonBack">Back</button>
+      <button class="primary" id="lessonNext">Next</button>
+    </div>
+  </section>
+
+  <!-- STUDY -->
+  <section id="studyView" class="hidden">
+    <div class="tabs">
+      <button id="tabFlash" class="active">Flashcards</button>
+      <button id="tabPractice">Practice</button>
+      <button id="tabEssay">Essay</button>
+      <button id="soundBtn">Sound: on</button>
+      <button class="spacer" id="studyBack">Home</button>
+    </div>
+    <div id="studyScope" class="hint" style="margin-bottom:12px"></div>
+
+    <!-- Flashcards: Got it removes a card from the deck, Again sends it to the back -->
+    <div id="flashPanel">
+      <div class="stats">
+        <div class="stat" id="deckLeft"></div>
+        <div class="stat" id="deckGot"></div>
+      </div>
+      <div class="box flash" id="flashCard" tabindex="0" role="button" aria-label="Flip card">
+        <div class="meta" id="flashSide"></div>
+        <p class="question" id="flashText" style="margin:0"></p>
+        <p class="hint" id="flashHint"></p>
+      </div>
+      <div class="row" id="flashButtons">
+        <button id="againBtn">Again</button>
+        <button class="primary" id="gotBtn">Got it</button>
+      </div>
+      <div class="row hidden" id="deckDoneRow">
+        <button class="primary" id="deckReset">Shuffle the deck again</button>
+      </div>
+    </div>
+
+    <!-- Practice: streak and points -->
+    <div id="practicePanel" class="hidden">
+      <div class="stats">
+        <div class="stat" id="pStreak">Streak 0</div>
+        <div class="stat" id="pPoints">Points 0</div>
+      </div>
+      <div class="box" id="pBox">
+        <div class="meta" id="pTopic"></div>
+        <p class="question" id="pText"></p>
+        <div class="choices" id="pChoices"></div>
+        <div class="feedback hidden" id="pFeedback"></div>
+        <div class="row">
+          <span class="num" id="pCount"></span>
+          <button class="primary" id="pNext" disabled>Next</button>
+        </div>
+      </div>
+    </div>
+    <div id="essayPanel" class="hidden">
+      <div class="box">
+        <div class="meta" id="essayCount"></div>
+        <p class="question" id="essayPrompt"></p>
+        <textarea id="essayText" rows="10" placeholder="Write your answer here. Use complete sentences." style="width:100%; font:inherit; border:3px solid #000; padding:10px; box-sizing:border-box; background:#fff; color:#000;"></textarea>
+        <div class="row">
+          <span class="num" id="essayWords"></span>
+          <button id="essayGrade" class="primary">Grade my essay</button>
+          <button id="essayShow">Show key points</button>
+        </div>
+        <div id="essayResult" class="feedback hidden"></div>
+        <div id="essayPoints" class="hidden" style="margin-top:14px"></div>
+      </div>
+      <div class="row">
+        <button id="essayPrev">Previous</button>
+        <button class="primary" id="essayNext">Next prompt</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ===== CONTENT: from the Medieval World unit design (Mr. Yingling, Grade 7) ===== */
+const QUESTIONS = [
+  { topic: "Barbarian Kingdoms", q: "Which group of people settled in Gaul and became the Franks' kingdom under Clovis?",
+    choices: ["Franks", "Vikings", "Mongols", "Samurai"], answer: 0,
+    why: "The Franks, led by Clovis, built one of the strongest kingdoms in post-Roman Europe." },
+  { topic: "Barbarian Kingdoms", q: "Which group raided Europe by sea from Scandinavia?",
+    choices: ["Vandals", "Vikings", "Huns", "Visigoths"], answer: 1,
+    why: "Vikings raided and settled across Europe from Scandinavia." },
+  { topic: "Geography", q: "Which feature of Europe's geography most limited contact between settlements in the early Middle Ages?",
+    choices: ["Mountains and rivers", "Deserts", "Tropical forests", "Volcanoes"], answer: 0,
+    why: "Mountains, rivers, and forests cut settlements off from each other, which shaped trade and kingdoms." },
+  { topic: "Barbarian Kingdoms", q: "Which group conquered England in 1066?",
+    choices: ["Normans", "Angles", "Mongols", "Ottomans"], answer: 0,
+    why: "William the Conqueror, a Norman, won the Battle of Hastings in 1066." },
+  { topic: "Feudalism", q: "In feudalism, what did a vassal give a lord in exchange for land?",
+    choices: ["Gold", "Military service and loyalty", "Religious teaching", "Taxes on trade"], answer: 1,
+    why: "Land (a fief) came with the duty to fight for the lord and stay loyal." },
+  { topic: "Feudalism", q: "Who worked the land on a medieval manor and was bound to it?",
+    choices: ["Knights", "Serfs", "Bishops", "Merchants"], answer: 1,
+    why: "Serfs farmed the lord's land and could not leave the manor." },
+  { topic: "Feudalism", q: "Which person was trained from boyhood to fight on horseback and follow a code of chivalry?",
+    choices: ["Knight", "Miller", "Monk", "Blacksmith"], answer: 0,
+    why: "Knights were trained warriors who followed chivalry." },
+  { topic: "Feudalism", q: "What was the feudal order from top to bottom?",
+    choices: ["Serfs, knights, lords, king", "King, lords, knights, serfs", "Lords, king, serfs, knights", "Knights, king, serfs, lords"], answer: 1,
+    why: "The king granted land to lords, lords to knights, and serfs worked the land." },
+  { topic: "Church", q: "Who led the Roman Catholic Church in Western Europe?",
+    choices: ["The pope", "The patriarch of Constantinople", "The shogun", "The caliph"], answer: 0,
+    why: "The pope in Rome led the Catholic Church, which was powerful across Western Europe." },
+  { topic: "Church", q: "Where did monks in medieval Europe copy and preserve books?",
+    choices: ["Monasteries", "Castles", "Guilds", "Ports"], answer: 0,
+    why: "Monasteries preserved learning and copied ancient texts." },
+  { topic: "Church", q: "What did people pay the Church, usually one tenth of their income or crops?",
+    choices: ["Tithe", "Tariff", "Tribute", "Toll"], answer: 0,
+    why: "A tithe was a tenth of income or crops given to the Church." },
+  { topic: "Crusades", q: "The Crusades were military campaigns to take which region from Muslim control?",
+    choices: ["The Holy Land", "Scandinavia", "England", "Japan"], answer: 0,
+    why: "Crusaders fought to take the Holy Land, including Jerusalem." },
+  { topic: "Crusades", q: "Which Muslim leader retook Jerusalem in 1187?",
+    choices: ["Saladin", "Charlemagne", "Genghis Khan", "Clovis"], answer: 0,
+    why: "Saladin recaptured Jerusalem in 1187." },
+  { topic: "Decline of Feudalism", q: "What did the Magna Carta (1215) do?",
+    choices: ["Limited the king's power and set rights for nobles", "Created the Mongol Empire", "Ended the Black Death", "Started the Crusades"], answer: 0,
+    why: "King John agreed to limits on his power, which led to rule of law." },
+  { topic: "Decline of Feudalism", q: "Which war between England and France lasted from 1337 to 1453?",
+    choices: ["The Hundred Years War", "The Crusades", "The Punic Wars", "The Thirty Years War"], answer: 0,
+    why: "The Hundred Years War was fought between England and France." },
+  { topic: "Plague", q: "What disease killed about a third or more of Europe's population from 1347 to 1351?",
+    choices: ["The Black Death", "Smallpox", "Malaria", "Influenza"], answer: 0,
+    why: "The Black Death, a plague, spread across Europe in the 1340s and 1350s." },
+  { topic: "Growth of Towns", q: "What were guilds in medieval towns?",
+    choices: ["Groups of craftspeople and merchants who set standards", "Armies of knights", "Monasteries", "Royal courts"], answer: 0,
+    why: "Guilds controlled trades, set quality standards, and protected members." },
+  { topic: "Growth of Towns", q: "What new social group grew in the late Middle Ages as trade and towns grew?",
+    choices: ["Middle class", "Samurai", "Serfs", "Vassals"], answer: 0,
+    why: "Merchants and craftspeople formed a middle class between nobles and peasants." },
+  { topic: "Decline of Feudalism", q: "How did the Hundred Years War and the Black Death help weaken feudalism?",
+    choices: ["They weakened lords and created a labor shortage", "They strengthened castles", "They ended trade", "They made serfs into lords"], answer: 0,
+    why: "Fewer workers after the plague gave peasants more power, and wars weakened the nobles." },
+  { topic: "Barbarian Kingdoms", q: "Which Germanic group settled in Spain and was also called the Visigoths?",
+    choices: ["Visigoths", "Mongols", "Huns", "Normans"], answer: 0,
+    why: "The Visigoths settled in Spain after the Western Roman Empire fell." },
+  { topic: "Geography", q: "Why did the Catholic Church and the feudal system both matter to trade in the Middle Ages?",
+    choices: ["Both controlled land and rules that shaped trade", "Both banned all trade", "Both only existed in Asia", "Both ended in 500 CE"], answer: 0,
+    why: "Lords and the Church owned land and set rules that shaped trade routes and towns." }
+];
+
+const CARDS = [
+  { topic: "Barbarian Kingdoms", term: "Franks", def: "Germanic people who built a strong kingdom in Gaul under Clovis." },
+  { topic: "Barbarian Kingdoms", term: "Vikings", def: "Raiders and settlers from Scandinavia who sailed across Europe." },
+  { topic: "Barbarian Kingdoms", term: "Normans", def: "Vikings who settled in France and conquered England in 1066." },
+  { topic: "Feudalism", term: "Feudalism", def: "A system where lords granted land to vassals in exchange for military service and loyalty." },
+  { topic: "Feudalism", term: "Fief", def: "A piece of land given by a lord to a vassal." },
+  { topic: "Feudalism", term: "Vassal", def: "A person who received land from a lord and promised service and loyalty in return." },
+  { topic: "Feudalism", term: "Manor", def: "A lord's estate, with fields, a village, and the serfs who worked the land." },
+  { topic: "Feudalism", term: "Serf", def: "A peasant bound to the manor who worked the lord's land." },
+  { topic: "Feudalism", term: "Chivalry", def: "The code of conduct that knights were expected to follow." },
+  { topic: "Church", term: "Pope", def: "The leader of the Roman Catholic Church, based in Rome." },
+  { topic: "Church", term: "Monastery", def: "A community of monks who prayed, worked, and copied books." },
+  { topic: "Church", term: "Tithe", def: "A tenth of income or crops given to the Church." },
+  { topic: "Crusades", term: "Crusades", def: "Holy wars from 1095 to 1291 in which European Christians tried to take the Holy Land." },
+  { topic: "Crusades", term: "Saladin", def: "Muslim leader who retook Jerusalem in 1187." },
+  { topic: "Decline of Feudalism", term: "Magna Carta", def: "A 1215 charter that limited the king's power and set rights for nobles." },
+  { topic: "Decline of Feudalism", term: "Hundred Years War", def: "A war from 1337 to 1453 between England and France." },
+  { topic: "Plague", term: "Black Death", def: "A plague that killed about a third or more of Europe's population from 1347 to 1351." },
+  { topic: "Growth of Towns", term: "Guild", def: "An association of craftspeople or merchants that set standards for a trade." },
+  { topic: "Growth of Towns", term: "Middle class", def: "Merchants and craftspeople who lived between nobles and peasants." }
+];
+
+const TEST_SECONDS = 20;
+
+/* ===== HELPERS ===== */
+const $ = id => document.getElementById(id);
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function show(id) {
+  ["startView", "testView", "resultsView", "studyView", "learnView", "lessonView"].forEach(v => $(v).classList.toggle("hidden", v !== id));
+  if (id !== "testView") stopTimer();
+  if (id === "startView") renderPrediction();
+}
+function topicsOf(list, key) {
+  return [...new Set(list.map(x => x[key] || "General"))];
+}
+function replay(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+/* Small beeps with the Web Audio API. Only plays after a click, and fails quietly. */
+let soundOn = true;
+function beep(freq, ms) {
+  if (!soundOn) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.value = 0.06;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + ms / 1000);
+  } catch (e) { /* no sound available */ }
+}
+function cheer() { beep(660, 90); setTimeout(() => beep(880, 120), 100); }
+function oops() { beep(220, 220); }
+$("soundBtn").addEventListener("click", () => {
+  soundOn = !soundOn;
+  $("soundBtn").textContent = `Sound: ${soundOn ? "on" : "off"}`;
+});
+
+/* ===== START ===== */
+$("startTest").addEventListener("click", startTest);
+$("startStudy").addEventListener("click", () => startStudy(null));
+
+/* ===== TEST ===== */
+let timerId = null;
+let timeLeft = TEST_SECONDS;
+
+function stopTimer() {
+  if (timerId) clearInterval(timerId);
+  timerId = null;
+}
+
+function startTest() {
+  lastPrediction = predictScore().pct;
+  testOrder = shuffle(QUESTIONS.map((_, i) => i));
+  testPos = 0;
+  testAnswers = [];
+  show("testView");
+  renderTest();
+}
+
+function renderTest() {
+  const total = testOrder.length;
+  if (testPos >= total) return finishTest();
+  const item = QUESTIONS[testOrder[testPos]];
+  $("testCount").textContent = `Question ${testPos + 1} of ${total}`;
+  $("testFill").style.width = `${(testPos / total) * 100}%`;
+  $("testTopic").textContent = `Multiple Choice · 1 point · ${item.topic || "General"}`;
+  $("testText").textContent = item.q;
+  $("testNext").disabled = true;
+  $("testNext").textContent = testPos === total - 1 ? "See results" : "Next";
+  replay($("testBox"), "pop");
+
+  const box = $("testChoices");
+  box.innerHTML = "";
+  item.choices.forEach((text, idx) => {
+    const b = document.createElement("button");
+    b.className = "choice";
+    b.textContent = text;
+    b.addEventListener("click", () => {
+      // Test mode: no feedback yet. Mark the pick and allow moving on.
+      [...box.children].forEach(c => c.classList.remove("active"));
+      b.classList.add("active");
+      testAnswers[testPos] = { qi: testOrder[testPos], picked: idx };
+      $("testNext").disabled = false;
+    });
+    box.appendChild(b);
+  });
+  if (testAnswers[testPos]) {
+    [...box.children][testAnswers[testPos].picked].classList.add("active");
+    $("testNext").disabled = false;
+  }
+
+  // Timer: restart for each question that has no answer yet.
+  stopTimer();
+  timeLeft = TEST_SECONDS;
+  drawTimer();
+  if (!testAnswers[testPos]) {
+    timerId = setInterval(() => {
+      timeLeft--;
+      drawTimer();
+      if (timeLeft <= 0) {
+        stopTimer();
+        // Ran out of time: record no answer and move on.
+        testAnswers[testPos] = { qi: testOrder[testPos], picked: -1 };
+        testPos++;
+        renderTest();
+      }
+    }, 1000);
+  }
+}
+
+function drawTimer() {
+  const t = $("testTimer");
+  t.textContent = Math.max(timeLeft, 0);
+  t.classList.toggle("low", timeLeft <= 5);
+  if (timeLeft <= 5 && timeLeft > 0) replay(t, "shake");
+}
+
+let testOrder = [];   // indices into QUESTIONS
+let testPos = 0;
+let testAnswers = []; // {qi, picked}
+
+$("testNext").addEventListener("click", () => {
+  stopTimer();
+  testPos++;
+  renderTest();
+});
+$("testQuit").addEventListener("click", () => show("startView"));
+
+function rankFor(pct) {
+  if (pct >= 90) return ["Legend of the Middle Ages", "You know this unit inside out."];
+  if (pct >= 70) return ["Court Scholar", "Strong work. Polish the topics you missed."];
+  if (pct >= 50) return ["Apprentice of the Middle Ages", "Good start. Study the misses and run it back."];
+  return ["Still Inside the Walls", "Every expert started here. Study, then take it again."];
+}
+
+function finishTest() {
+  stopTimer();
+  show("resultsView");
+  const total = testOrder.length;
+  const results = testAnswers.map(a => ({ ...a, correct: a.picked === QUESTIONS[a.qi].answer }));
+  const score = results.filter(r => r.correct).length;
+  const pct = total ? Math.round((score / total) * 100) : 0;
+  results.forEach(r => recordAnswer(r.qi, r.correct));
+  // Results show only the updated predicted score, not the test score.
+  $("predBig").textContent = `${predictScore().pct}%`;
+  $("predNote").textContent = "Based on your answers so far. Unanswered questions count as 50%.";
+  $("testScoreLine").textContent = `Your score on this test: ${score} / ${total} (${Math.round((score / total) * 100)}%)`;
+
+  // Missed questions
+  const missed = results.filter(r => !r.correct);
+  $("studyMissed").disabled = !missed.length;
+  $("studyMissed").onclick = () => {
+    // Only the missed questions: practice uses them directly, and flashcards are built from them.
+    startStudy({
+      qs: missed.map(r => r.qi),
+      cards: missed.map(r => {
+        const item = QUESTIONS[r.qi];
+        return { topic: item.topic, term: item.q, def: item.choices[item.answer] + ". " + item.why };
+      }),
+      label: `Only your ${missed.length} missed question${missed.length === 1 ? "" : "s"}`
+    });
+  };
+}
+$("studyAll").addEventListener("click", () => startStudy(null));
+$("retake").addEventListener("click", startTest);
+$("backStart").addEventListener("click", () => show("startView"));
+
+/* ===== STUDY ===== */
+// scope null = everything; otherwise {qs, cards, label}
+let studyQs = [];
+let studyCards = [];
+let pIdx = 0, pAnswered = false, pStreak = 0, pPoints = 0;
+let deck = [];        // card indices still to get right
+let gotCount = 0;
+let flipped = false;
+
+function startStudy(scope) {
+  studyQs = scope ? scope.qs : QUESTIONS.map((_, i) => i);
+  studyCards = scope ? scope.cards : CARDS.slice();
+  $("studyScope").textContent = scope ? scope.label : "Everything in the packet";
+  pIdx = 0; pAnswered = false; pStreak = 0; pPoints = 0;
+  deck = shuffle(studyCards);
+  gotCount = 0;
+  flipped = false;
+  show("studyView");
+  setStudyTab("flash");
+}
+
+function setStudyTab(tab) {
+  $("flashPanel").classList.toggle("hidden", tab !== "flash");
+  $("practicePanel").classList.toggle("hidden", tab !== "practice");
+  $("essayPanel").classList.toggle("hidden", tab !== "essay");
+  $("tabFlash").classList.toggle("active", tab === "flash");
+  $("tabPractice").classList.toggle("active", tab === "practice");
+  $("tabEssay").classList.toggle("active", tab === "essay");
+  if (tab === "flash") renderCard();
+  else if (tab === "practice") renderPractice();
+  else renderEssay();
+}
+$("tabFlash").addEventListener("click", () => setStudyTab("flash"));
+$("tabPractice").addEventListener("click", () => setStudyTab("practice"));
+$("tabEssay").addEventListener("click", () => setStudyTab("essay"));
+$("studyBack").addEventListener("click", () => show("startView"));
+
+/* Flashcards: Got it removes the card. Again sends it to the back of the deck. */
+function renderCard() {
+  const total = studyCards.length;
+  $("deckGot").textContent = `Got: ${gotCount}`;
+  $("deckLeft").textContent = `Left: ${deck.length}`;
+  if (!total) {
+    $("flashText").textContent = "No cards for this topic yet.";
+    $("flashSide").textContent = "";
+    $("flashHint").textContent = "";
+    $("flashButtons").classList.add("hidden");
+    return;
+  }
+  if (!deck.length) {
+    $("flashText").textContent = "Deck cleared. Every card is a Got it.";
+    $("flashSide").textContent = "Done";
+    $("flashHint").textContent = "";
+    $("flashButtons").classList.add("hidden");
+    $("deckDoneRow").classList.remove("hidden");
+    cheer();
+    return;
+  }
+  $("flashButtons").classList.toggle("hidden", !flipped);
+  $("deckDoneRow").classList.add("hidden");
+  const c = deck[0];
+  $("flashSide").textContent = flipped ? "Definition" : "Term";
+  $("flashText").textContent = flipped ? c.def : c.term;
+  $("flashHint").textContent = flipped ? "" : "Tap the card to flip it";
+  replay($("flashCard"), "pop");
+}
+function flipCard() {
+  if (!deck.length) return;
+  flipped = !flipped;
+  renderCard();
+}
+function gotCard() {
+  deck.shift();
+  gotCount++;
+  flipped = false;
+  cheer();
+  renderCard();
+}
+function againCard() {
+  deck.push(deck.shift());
+  flipped = false;
+  oops();
+  renderCard();
+}
+function resetDeck() {
+  deck = shuffle(studyCards);
+  gotCount = 0;
+  flipped = false;
+  renderCard();
+}
+$("flashCard").addEventListener("click", flipCard);
+$("flashCard").addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipCard(); }
+});
+$("gotBtn").addEventListener("click", gotCard);
+$("againBtn").addEventListener("click", againCard);
+$("deckReset").addEventListener("click", resetDeck);
+
+/* Practice: streaks and points */
+function renderPractice() {
+  $("pStreak").textContent = `Streak ${pStreak}`;
+  $("pPoints").textContent = `Points ${pPoints}`;
+  if (!studyQs.length) {
+    $("pText").textContent = "No questions for this topic yet.";
+    $("pChoices").innerHTML = "";
+    $("pCount").textContent = "";
+    $("pNext").disabled = true;
+    return;
+  }
+  const item = QUESTIONS[studyQs[pIdx]];
+  pAnswered = false;
+  $("pTopic").textContent = `Multiple Choice · 1 point · ${item.topic || "General"}`;
+  $("pText").textContent = item.q;
+  $("pCount").textContent = `${pIdx + 1} of ${studyQs.length}`;
+  $("pFeedback").classList.add("hidden");
+  $("pFeedback").textContent = "";
+  $("pNext").disabled = true;
+  $("pNext").textContent = pIdx === studyQs.length - 1 ? "Start over" : "Next";
+  replay($("pBox"), "pop");
+  const box = $("pChoices");
+  box.innerHTML = "";
+  item.choices.forEach((text, idx) => {
+    const b = document.createElement("button");
+    b.className = "choice";
+    b.textContent = text;
+    b.addEventListener("click", () => answerPractice(idx));
+    box.appendChild(b);
+  });
+}
+function answerPractice(idx) {
+  if (pAnswered) return;
+  pAnswered = true;
+  const item = QUESTIONS[studyQs[pIdx]];
+  [...$("pChoices").children].forEach((b, i) => {
+    b.disabled = true;
+    if (i === item.answer) b.classList.add("correct");
+    else if (i === idx) b.classList.add("wrong");
+  });
+  const right = idx === item.answer;
+  if (right) {
+    pStreak++;
+    recordAnswer(studyQs[pIdx], true);
+    // 10 points, plus 5 bonus for each answer in a row past the first.
+    pPoints += 10 + Math.min(pStreak - 1, 5) * 5;
+    cheer();
+  } else {
+    pStreak = 0;
+    recordAnswer(studyQs[pIdx], false);
+    oops();
+  }
+  const fb = $("pFeedback");
+  fb.innerHTML = "";
+  const strong = document.createElement("strong");
+  let headline;
+  if (right) {
+    headline = pStreak >= 3 ? `Correct! ${pStreak} in a row.` : "Correct!";
+  } else {
+    headline = "Not quite. The answer is: " + item.choices[item.answer];
+  }
+  strong.textContent = headline;
+  const span = document.createElement("span");
+  span.textContent = item.why || "";
+  fb.append(strong, span);
+  fb.classList.remove("hidden");
+  $("pStreak").textContent = `Streak ${pStreak}`;
+  $("pPoints").textContent = `Points ${pPoints}`;
+  $("pNext").disabled = false;
+  $("pNext").focus();
+}
+$("pNext").addEventListener("click", () => {
+  pIdx = pIdx === studyQs.length - 1 ? 0 : pIdx + 1;
+  renderPractice();
+});
+
+/* ===== LEARNING CENTER ===== */
+const LESSONS = [
+  { title: "Europe After Rome", topic: "Barbarian Kingdoms",
+    summary: "How geography and new groups shaped Europe after the Western Roman Empire fell.",
+    points: [
+      "After the Western Roman Empire fell, Germanic groups like the Franks, Visigoths, and Angles settled across Europe.",
+      "The Franks under Clovis built one of the strongest kingdoms, and later Charlemagne ruled a large empire.",
+      "Vikings raided and settled from Scandinavia, and Normans, a Viking people in France, conquered England in 1066.",
+      "Mountains, rivers, and forests separated settlements, so local lords and communities became more independent."
+    ] },
+  { title: "Feudalism and the Manor", topic: "Feudalism",
+    summary: "The system of land, loyalty, and service that organized medieval life.",
+    points: [
+      "Under feudalism, the king granted land to lords, lords granted land to vassals, and vassals owed military service.",
+      "A fief was the land given to a vassal. The vassal promised loyalty and service in return.",
+      "On a manor, serfs farmed the lord's land and could not leave it.",
+      "Knights were trained warriors who followed a code of chivalry."
+    ] },
+  { title: "The Church and the Crusades", topic: "Church",
+    summary: "The power of the Catholic Church and the holy wars that followed.",
+    points: [
+      "The Catholic Church, led by the pope in Rome, was powerful across Western Europe.",
+      "Monasteries preserved learning by copying books, and people paid a tithe, a tenth of income or crops.",
+      "The Crusades from 1095 to 1291 were holy wars to take the Holy Land, including Jerusalem.",
+      "Saladin retook Jerusalem in 1187. The Crusades increased trade and contact between Europe and the Muslim world."
+    ] },
+  { title: "Decline of Feudalism", topic: "Decline of Feudalism",
+    summary: "How the Magna Carta, wars, plague, and towns changed medieval Europe.",
+    points: [
+      "The Magna Carta (1215) limited the king's power and set rights for nobles, which helped lead to the rule of law.",
+      "The Hundred Years War (1337 to 1453) between England and France weakened the nobles.",
+      "The Black Death (1347 to 1351) killed about a third or more of Europe's population, creating a labor shortage that gave peasants more power.",
+      "Towns, guilds, and trade grew, creating a middle class and helping lead to nation-states."
+    ] }
+];
+
+let lesson = null, lessonMode = "asap", steps = [], stepIdx = 0, lessonScore = 0, answeredQ = {};
+
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+
+function renderLearn() {
+  const list = $("lessonList");
+  list.innerHTML = "";
+  LESSONS.forEach((L, idx) => {
+    const qCount = QUESTIONS.filter(q => q.topic === L.topic).length;
+    const cCount = CARDS.filter(c => c.topic === L.topic).length;
+    const box = el("div", "", "lesson");
+    const row = el("div", "", "row");
+    row.style.marginTop = "0";
+    const asap = el("button", "ASAP");
+    asap.addEventListener("click", () => openLesson(idx, "asap"));
+    const slow = el("button", "Take your time", "primary");
+    slow.addEventListener("click", () => openLesson(idx, "slow"));
+    row.append(asap, slow);
+    box.append(
+      el("h3", `${idx + 1}. ${L.title}`),
+      el("p", L.summary),
+      el("p", `${L.points.length} key points · ${cCount} flashcards · ${qCount} questions`, "hint"),
+      row
+    );
+    list.appendChild(box);
+  });
+}
+
+function openLesson(idx, mode) {
+  lesson = LESSONS[idx];
+  lessonMode = mode;
+  stepIdx = 0;
+  lessonScore = 0;
+  answeredQ = {};
+  const qis = QUESTIONS.map((_, i) => i).filter(i => QUESTIONS[i].topic === lesson.topic);
+  const cards = CARDS.filter(c => c.topic === lesson.topic);
+  if (mode === "asap") {
+    steps = [{ type: "summary" }, ...qis.map(qi => ({ type: "quiz", qi })), { type: "done" }];
+  } else {
+    steps = [
+      ...lesson.points.map((text, i) => ({ type: "point", text, n: i + 1, total: lesson.points.length })),
+      ...cards.map(card => ({ type: "card", card })),
+      ...qis.map(qi => ({ type: "quiz", qi })),
+      { type: "done" }
+    ];
+  }
+  show("lessonView");
+  renderStep();
+}
+
+function setNext(enabled) {
+  $("lessonNext").disabled = !enabled;
+}
+
+function renderStep() {
+  const s = steps[stepIdx];
+  const body = $("lessonBody");
+  body.innerHTML = "";
+  $("lessonNav").classList.toggle("hidden", s.type === "done");
+  $("lessonFill").style.width = `${(stepIdx / steps.length) * 100}%`;
+  $("lessonCount").textContent = `${lesson.title} · ${stepIdx + 1} of ${steps.length}`;
+  $("lessonBack").disabled = stepIdx === 0;
+  $("lessonNext").textContent = stepIdx === steps.length - 1 ? "Finish" : "Next";
+  setNext(true);
+  replay($("lessonBox"), "pop");
+
+  if (s.type === "summary") {
+    const ul = el("ul");
+    lesson.points.forEach(t => ul.appendChild(el("li", t)));
+    body.append(el("div", "Key points", "meta"), ul, el("p", "Next up: a quick check on this lesson.", "hint"));
+
+  } else if (s.type === "point") {
+    body.append(el("div", `Point ${s.n} of ${s.total}`, "meta"), el("p", s.text, "question"));
+
+  } else if (s.type === "card") {
+    const answer = el("p", s.card.def);
+    answer.classList.add("hidden");
+    const reveal = el("button", "Show answer");
+    setNext(false);
+    reveal.addEventListener("click", () => {
+      answer.classList.remove("hidden");
+      reveal.disabled = true;
+      setNext(true);
+    });
+    body.append(el("div", "Flashcard", "meta"), el("p", s.card.term, "question"), reveal, answer);
+
+  } else if (s.type === "quiz") {
+    const item = QUESTIONS[s.qi];
+    const choices = el("div", "", "choices");
+    const fb = el("div", "", "feedback hidden");
+    setNext(false);
+    item.choices.forEach((text, idx) => {
+      const b = el("button", text, "choice");
+      b.addEventListener("click", () => {
+        const right = idx === item.answer;
+        [...choices.children].forEach((c, i) => {
+          c.disabled = true;
+          if (i === item.answer) c.classList.add("correct");
+          else if (i === idx) c.classList.add("wrong");
+        });
+        if (right && !answeredQ[s.qi]) { lessonScore++; cheer(); }
+        else if (!right) oops();
+        if (!answeredQ[s.qi]) recordAnswer(s.qi, right);
+        answeredQ[s.qi] = true;
+        fb.innerHTML = "";
+        fb.append(
+          el("strong", right ? "Correct." : "Not quite. The answer is: " + item.choices[item.answer]),
+          el("span", item.why)
+        );
+        fb.classList.remove("hidden");
+        setNext(true);
+      });
+      choices.appendChild(b);
+    });
+    body.append(el("div", "Quick check", "meta"), el("p", item.q, "question"), choices, fb);
+
+  } else if (s.type === "done") {
+    const quizTotal = steps.filter(x => x.type === "quiz").length;
+    const pct = quizTotal ? Math.round((lessonScore / quizTotal) * 100) : 100;
+    const row = el("div", "", "row");
+    const again = el("button", "Replay this lesson");
+    again.addEventListener("click", () => openLesson(LESSONS.indexOf(lesson), lessonMode));
+    const all = el("button", "All lessons", "primary");
+    all.addEventListener("click", () => { renderLearn(); show("learnView"); });
+    row.append(again, all);
+    body.append(
+      el("div", "Lesson complete", "meta"),
+      el("div", `${lessonScore} / ${quizTotal}`, "result-big"),
+      el("p", pct >= 70 ? "Nice work. Move on to the next lesson, or run this one again." : "Run this one again, or review the key points first."),
+      row
+    );
+  }
+}
+
+$("startLearn").addEventListener("click", () => { renderLearn(); show("learnView"); });
+$("learnBack").addEventListener("click", () => show("startView"));
+$("lessonQuit").addEventListener("click", () => { renderLearn(); show("learnView"); });
+$("lessonNext").addEventListener("click", () => {
+  if (stepIdx < steps.length - 1) { stepIdx++; renderStep(); }
+});
+$("lessonBack").addEventListener("click", () => {
+  if (stepIdx > 0) { stepIdx--; renderStep(); }
+});
+
+/* ===== TEST PREDICTOR =====
+   Keeps a per-browser log of answers from practice, lessons, and tests.
+   The prediction is the average estimated chance of getting each question right.
+   Unanswered questions count as a 50% chance. */
+const HISTORY_KEY = "medievalGame.answerLog.v1";
+let answerLog = {};
+try { answerLog = JSON.parse(localStorage.getItem(HISTORY_KEY)) || {}; } catch (e) { answerLog = {}; }
+let lastPrediction = 0;
+
+function saveAnswerLog() {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(answerLog)); } catch (e) { /* storage blocked: keep it in memory only */ }
+}
+function recordAnswer(qi, correct) {
+  const r = answerLog[qi] || { seen: 0, correct: 0 };
+  r.seen++;
+  if (correct) r.correct++;
+  answerLog[qi] = r;
+  saveAnswerLog();
+}
+function predictScore() {
+  let total = 0, studied = 0;
+  QUESTIONS.forEach((_, qi) => {
+    const r = answerLog[qi];
+    if (r) { studied++; total += r.correct / r.seen; }
+    else total += 0.5;
+  });
+  return { pct: Math.round((total / QUESTIONS.length) * 100), studied };
+}
+function renderPrediction() {
+  const p = predictScore();
+  $("predictLine").textContent = p.studied
+    ? `Predicted test score: ${p.pct}%, based on ${p.studied} of ${QUESTIONS.length} questions you have answered.`
+    : "Predicted test score: not enough data yet. Practice or take the test to get a prediction.";
+}
+
+/* ===== ESSAY PRACTICE =====
+   Write a short answer, then check it against the key points. Nothing is graded. */
+/* Four essential questions from the unit. Each has key ideas the grader looks for.
+   A key idea counts as covered if the essay includes any of its keywords. */
+const ESSAYS = [
+  { prompt: "How did geography shape Europe's settlements, trade, and kingdoms after the Western Roman Empire fell?", source: "Europe After Rome", minWords: 60,
+    ideas: [
+      { label: "Mountains, rivers, or forests separated settlements", any: ["mountain", "river", "forest", "geograph", "separat", "isolat"] },
+      { label: "Germanic groups such as the Franks or Visigoths settled Europe", any: ["frank", "visigoth", "angle", "germanic", "barbarian", "clovis"] },
+      { label: "Vikings or Normans raided, settled, or conquered", any: ["viking", "norman", "raid", "conquer", "1066"] },
+      { label: "Trade or contact between settlements", any: ["trade", "route", "contact", "merchant"] }
+    ] },
+  { prompt: "How did feudalism organize medieval society? Describe the roles of lords, vassals, knights, and serfs.", source: "Feudalism", minWords: 60,
+    ideas: [
+      { label: "The king or lords granted land (fiefs)", any: ["fief", "grant", "land"] },
+      { label: "Vassals owed military service and loyalty", any: ["vassal", "service", "loyal", "military"] },
+      { label: "Knights were trained warriors who followed chivalry", any: ["knight", "chivalry"] },
+      { label: "Serfs farmed the lord's manor and could not leave", any: ["serf", "manor", "farm", "peasant"] }
+    ] },
+  { prompt: "What role did the Catholic Church play in medieval Europe, and how did the Crusades affect Christians, Muslims, and Jews?", source: "Church and Crusades", minWords: 60,
+    ideas: [
+      { label: "The pope and the Church were powerful in Western Europe", any: ["pope", "church", "catholic"] },
+      { label: "Monasteries preserved books and learning, or people paid tithes", any: ["monaster", "monk", "book", "tithe"] },
+      { label: "The Crusades aimed to take the Holy Land and Jerusalem", any: ["crusade", "holy land", "jerusalem"] },
+      { label: "Muslims, such as Saladin, defended Jerusalem", any: ["muslim", "saladin"] },
+      { label: "Jews were also affected, since Jerusalem is holy to them", any: ["jew", "jewish"] }
+    ] },
+  { prompt: "What events and circumstances led to the decline of feudalism and the rise of nation-states?", source: "Decline of Feudalism", minWords: 60,
+    ideas: [
+      { label: "The Magna Carta limited the king's power", any: ["magna carta", "1215", "limit"] },
+      { label: "The Hundred Years War weakened the nobles", any: ["hundred years", "war"] },
+      { label: "The Black Death killed many people and created labor shortages", any: ["black death", "plague", "labor", "shortage"] },
+      { label: "Towns, guilds, and trade grew", any: ["town", "guild", "trade", "middle class"] },
+      { label: "Nation-states or the rule of law developed", any: ["nation", "state", "law", "king"] }
+    ] }
+];
+
+let essayIdx = 0;
+const essayDrafts = {};
+
+function updateEssayWords() {
+  const n = $("essayText").value.trim().split(/\s+/).filter(Boolean).length;
+  $("essayWords").textContent = `${n} word${n === 1 ? "" : "s"}`;
+}
+
+function renderEssay() {
+  const e = ESSAYS[essayIdx];
+  $("essayCount").textContent = `Short Answer/Essay · 4 points · Word limit: 100 · ${e.source} · Prompt ${essayIdx + 1} of ${ESSAYS.length}`;
+  $("essayPrompt").textContent = e.prompt;
+  $("essayText").value = essayDrafts[essayIdx] || "";
+  updateEssayWords();
+
+  const pts = $("essayPoints");
+  pts.innerHTML = "";
+  pts.classList.add("hidden");
+  pts.append(el("div", "Key points. Check off the ones your answer covers.", "meta"));
+  e.ideas.forEach(idea => {
+    const lab = el("label", "");
+    lab.style.display = "block";
+    lab.style.margin = "0 0 8px";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    lab.append(cb, " " + idea.label);
+    pts.appendChild(lab);
+  });
+  $("essayShow").textContent = "Show key points";
+  $("essayResult").classList.add("hidden");
+  $("essayPrev").disabled = essayIdx === 0;
+  $("essayNext").disabled = essayIdx === ESSAYS.length - 1;
+}
+
+$("essayText").addEventListener("input", () => {
+  essayDrafts[essayIdx] = $("essayText").value;
+  updateEssayWords();
+});
+$("essayShow").addEventListener("click", () => {
+  const nowHidden = $("essayPoints").classList.toggle("hidden");
+  $("essayShow").textContent = nowHidden ? "Show key points" : "Hide key points";
+});
+$("essayPrev").addEventListener("click", () => {
+  if (essayIdx > 0) { essayIdx--; renderEssay(); }
+});
+$("essayNext").addEventListener("click", () => {
+  if (essayIdx < ESSAYS.length - 1) { essayIdx++; renderEssay(); }
+});
+
+/* ===== ESSAY GRADER =====
+   Checks which key ideas appear in the essay, by keyword. It is an automatic check, not a teacher's grade. */
+function gradeEssay(text, e) {
+  const t = text.toLowerCase();
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  const hit = e.ideas.filter(idea => idea.any.some(k => t.includes(k)));
+  const missed = e.ideas.filter(idea => !hit.includes(idea));
+  let pct = Math.round((hit.length / e.ideas.length) * 100);
+  if (words < e.minWords) pct = Math.min(pct, 70);
+  return { words, hit, missed, pct };
+}
+function letterFor(p) {
+  if (p >= 90) return "A";
+  if (p >= 80) return "B";
+  if (p >= 70) return "C";
+  if (p >= 60) return "D";
+  return "F";
+}
+$("essayGrade").addEventListener("click", () => {
+  const e = ESSAYS[essayIdx];
+  const r = gradeEssay($("essayText").value, e);
+  const box = $("essayResult");
+  box.innerHTML = "";
+  box.append(
+    el("strong", `Score: ${r.pct}% (${letterFor(r.pct)})`),
+    el("p", `${r.hit.length} of ${e.ideas.length} key ideas covered. ${r.words} words.`)
+  );
+  if (r.words < e.minWords) box.append(el("p", `Under ${e.minWords} words, so the score is capped at 70%.`, "hint"));
+  if (r.hit.length) {
+    box.append(el("div", "Covered", "meta"));
+    const ul = el("ul");
+    r.hit.forEach(i => ul.appendChild(el("li", i.label)));
+    box.appendChild(ul);
+  }
+  if (r.missed.length) {
+    box.append(el("div", "Missing", "meta"));
+    const ul = el("ul");
+    r.missed.forEach(i => ul.appendChild(el("li", i.label)));
+    box.appendChild(ul);
+  }
+  box.append(el("p", "Automatic check of key ideas. It is not a teacher's grade.", "hint"));
+  box.classList.remove("hidden");
+});
+
+/* Shuffle each question's answer choices once, so the correct answer is not always first. */
+QUESTIONS.forEach(q => {
+  const correctText = q.choices[q.answer];
+  q.choices = shuffle(q.choices);
+  q.answer = q.choices.indexOf(correctText);
+});
+
+/* ===== INIT ===== */
+show("startView");
+</script>
+</body>
+</html>
