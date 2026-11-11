@@ -125,6 +125,7 @@ ul.topics { padding-left: 20px; margin: 8px 0 16px; }
       <div class="meta">Your predicted test score</div>
       <div class="score-big" id="predBig"></div>
       <div class="hint" id="predNote"></div>
+      <div class="hint" id="testScoreLine"></div>
     </div>
     <div class="row">
       <button class="primary" id="studyMissed">Study what I missed</button>
@@ -510,7 +511,8 @@ function finishTest() {
   results.forEach(r => recordAnswer(r.qi, r.correct));
   // Results show only the updated predicted score, not the test score.
   $("predBig").textContent = `${predictScore().pct}%`;
-  $("predNote").textContent = "Based on everything you have answered so far. Study what you missed to raise it.";
+  $("predNote").textContent = "Based on your answers so far. Unanswered questions count as 50%.";
+  $("testScoreLine").textContent = `Your score on this test: ${score} / ${total} (${Math.round((score / total) * 100)}%)`;
 
   // Missed questions
   const missed = results.filter(r => !r.correct);
@@ -944,7 +946,7 @@ function predictScore() {
   let total = 0, studied = 0;
   QUESTIONS.forEach((_, qi) => {
     const r = answerLog[qi];
-    if (r) { studied++; total += (r.correct + 1) / (r.seen + 2); }
+    if (r) { studied++; total += r.correct / r.seen; }
     else total += 0.5;
   });
   return { pct: Math.round((total / QUESTIONS.length) * 100), studied };
@@ -1084,6 +1086,13 @@ $("essayGrade").addEventListener("click", () => {
   }
   box.append(el("p", "Automatic check of key ideas. It is not a teacher's grade.", "hint"));
   box.classList.remove("hidden");
+});
+
+/* Shuffle each question's answer choices once, so the correct answer is not always first. */
+QUESTIONS.forEach(q => {
+  const correctText = q.choices[q.answer];
+  q.choices = shuffle(q.choices);
+  q.answer = q.choices.indexOf(correctText);
 });
 
 /* ===== INIT ===== */
