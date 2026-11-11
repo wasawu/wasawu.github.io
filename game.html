@@ -431,7 +431,7 @@ function renderTest() {
   const item = QUESTIONS[testOrder[testPos]];
   $("testCount").textContent = `Question ${testPos + 1} of ${total}`;
   $("testFill").style.width = `${(testPos / total) * 100}%`;
-  $("testTopic").textContent = item.topic || "General";
+  $("testTopic").textContent = `Multiple Choice · 1 point · ${item.topic || "General"}`;
   $("testText").textContent = item.q;
   $("testNext").disabled = true;
   $("testNext").textContent = testPos === total - 1 ? "See results" : "Next";
@@ -644,7 +644,7 @@ function renderPractice() {
   }
   const item = QUESTIONS[studyQs[pIdx]];
   pAnswered = false;
-  $("pTopic").textContent = item.topic || "General";
+  $("pTopic").textContent = `Multiple Choice · 1 point · ${item.topic || "General"}`;
   $("pText").textContent = item.q;
   $("pCount").textContent = `${pIdx + 1} of ${studyQs.length}`;
   $("pFeedback").classList.add("hidden");
@@ -1005,7 +1005,7 @@ function updateEssayWords() {
 
 function renderEssay() {
   const e = ESSAYS[essayIdx];
-  $("essayCount").textContent = `Prompt ${essayIdx + 1} of ${ESSAYS.length}`;
+  $("essayCount").textContent = `Short Answer/Essay · 4 points · Word limit: 100 · ${e.source} · Prompt ${essayIdx + 1} of ${ESSAYS.length}`;
   $("essayPrompt").textContent = e.prompt;
   $("essayText").value = essayDrafts[essayIdx] || "";
   updateEssayWords();
